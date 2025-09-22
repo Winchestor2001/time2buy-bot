@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
+from core.utils import get_reverse_link
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -180,4 +182,61 @@ UNFOLD = {
             "important-dark": "var(--color-primary-100)",
         },
     },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+
+        "navigation": [
+            {
+                "title": "Пользователи",
+                "separator": True,  # Top border
+                "collapsible": True,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": "TG Пользователи",
+                        "icon": "group",
+                        "link": get_reverse_link(app_name="users", model_name="telegramuser"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                    {
+                        "title": "Админы",
+                        "icon": "shield_person",
+                        "link": get_reverse_link(app_name="auth", model_name="user"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                "title": "Каталог",
+                "separator": True,  # Top border
+                "collapsible": True,  # Collapsible group of links
+                "items": [
+                    {
+                        "title": "Категории",
+                        "icon": "category",
+                        "link": get_reverse_link(app_name="shop", model_name="category"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                    {
+                        "title": "Товары",
+                        "icon": "shopping_bag",
+                        "link": get_reverse_link(app_name="shop", model_name="product"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                    {
+                        "title": "Баннеры",
+                        "icon": "image",
+                        "link": get_reverse_link(app_name="shop", model_name="banner"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                    {
+                        "title": "Инфо-страницы",
+                        "icon": "info",
+                        "link": get_reverse_link(app_name="shop", model_name="infopage"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                ],
+            },
+        ]
+    }
 }

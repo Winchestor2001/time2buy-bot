@@ -25,6 +25,10 @@ class TelegramUserAdmin(ModelAdmin):
     readonly_fields = ("created_at","updated_at")
     ordering = ("-created_at",)
 
+    def has_add_permission(self, request):
+        # полностью отключаем кнопку "Добавить"
+        return False
+
     # --- кастомный URL для формы рассылки ---
     def get_urls(self):
         urls = super().get_urls()
