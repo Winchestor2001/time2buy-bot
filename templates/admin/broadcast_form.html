@@ -19,6 +19,13 @@
           {{ form.media_type }}
         </div>
 
+        {# ⬇⬇⬇ ДОБАВЛЕНО: поле файла, по умолчанию скрыто #}
+        <div class="form-row" id="file-row" style="display:none;">
+          <label class="field-label" for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+          {{ form.file }}
+          <p class="field-help">{% trans "Фото/видео/гиф в зависимости от типа" %}</p>
+        </div>
+
         <div class="form-row">
           <label class="field-label" for="{{ form.text.id_for_label }}">{{ form.text.label }}</label>
           {{ form.text }}
@@ -39,4 +46,36 @@
       </form>
     </div>
   </div>
+
+  {# ⬇⬇⬇ Скрипт переключения видимости и accept #}
+  <script>
+    (function () {
+      const typeSel = document.getElementById('id_media_type');
+      const fileRow = document.getElementById('file-row');
+      const fileInp = document.getElementById('id_file');
+
+      if (!typeSel || !fileRow || !fileInp) return;
+
+      function applyVisibility() {
+        const t = typeSel.value;               // text | photo | video | animation
+        const needsFile = t !== 'text';
+        fileRow.style.display = needsFile ? '' : 'none';
+        fileInp.required = needsFile;
+
+        if (t === 'photo') {
+          fileInp.accept = 'image/*';
+        } else if (t === 'video') {
+          fileInp.accept = 'video/*';
+        } else if (t === 'animation') {
+          fileInp.accept = 'image/gif, video/*';
+        } else {
+          fileInp.removeAttribute('accept');
+        }
+      }
+
+      typeSel.addEventListener('change', applyVisibility);
+      document.addEventListener('DOMContentLoaded', applyVisibility);
+      applyVisibility();
+    })();
+  </script>
 {% endblock %}
