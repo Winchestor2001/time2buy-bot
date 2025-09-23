@@ -15,6 +15,7 @@ help:
 	@echo "  make restart-all      - перезапустить всё (django + bot)"
 	@echo "  make logs-django      - показать логи Django"
 	@echo "  make logs-bot         - показать логи бота"
+	@echo "  make r-install        - установить зависимости из requirements.txt"
 
 migrate:
 	. .venv/bin/activate && python manage.py migrate
@@ -38,3 +39,6 @@ logs-django:
 
 logs-bot:
 	sudo journalctl -u $(BOT_SERVICE) -f
+
+r-install:
+	. .venv/bin/activate && pip install -r requirements.txt
