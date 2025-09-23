@@ -4,14 +4,19 @@ from rest_framework.response import Response
 from django.db.models import Prefetch
 from rest_framework.views import APIView
 
+from bot.config import BOT_TOKEN
+from users.models import TelegramUser
 from .models import Category, Product, Banner, CartItem, InfoPage
 from .pagination import DefaultPagination
 from .serializers import (
     CategorySerializer, CategoryFlatSerializer,
     ProductSerializer, BannerSerializer, CartItemSerializer,
     InfoPageSerializer, CheckoutResponseSerializer, CheckoutRequestSerializer, CartChangeQuantitySerializer,
-    CartDeleteItemSerializer, CartClearSerializer,
+    CartDeleteItemSerializer, CartClearSerializer, TelegramWebAppAuthRequestSerializer,
+    TelegramWebAppAuthResponseSerializer,
 )
+from .telegram_auth import verify_telegram_init_data
+
 
 # --- Категории ---
 
@@ -207,3 +212,63 @@ class InfoPageDetailView(generics.RetrieveAPIView):
     serializer_class = InfoPageSerializer
     permission_classes = [permissions.AllowAny]
     lookup_field = "slug"
+
+
+class TelegramWebAppAuthView(APIView):
+    """
+    POST /api/auth/telegram/  { "initData": "<window.Telegram.WebApp.initData>" }
+    Возвращает верифицированные данные юзера.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        request=TelegramWebAppAuthRequestSerializer,
+        responses={200: TelegramWebAppAuthResponseSerializer, 400: dict},
+        description="Верификация подписи Telegram WebApp и возврат user-данных"
+    )
+    def post(self, request):
+        ser = TelegramWebAppAuthRequestSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        init_data = ser.validated_data["initData"]
+
+        bot_token = BOT_TOKEN
+        if not bot_token:
+            return Response({"detail": "BOT_TOKEN не настроен"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        ok, payload, err = verify_telegram_init_data(init_data, bot_token, max_age=24 * 3600)
+        if not ok:
+            return Response({"ok": False, "detail": err}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_data = payload.get("user") or {}
+        # нормализуем поля
+        tg_id = int(user_data.get("id"))
+        username = user_data.get("username")
+        first_name = user_data.get("first_name")
+        last_name = user_data.get("last_name")
+        language_code = user_data.get("language_code")
+        is_premium = bool(user_data.get("is_premium", False))
+
+        # создадим/обновим пользователя в БД (необязательно, но удобно)
+        TelegramUser.objects.update_or_create(
+            tg_id=tg_id,
+            defaults=dict(
+                username=username,
+                first_name=first_name,
+                last_name=last_name,
+                language_code=language_code,
+                is_premium=is_premium,
+            ),
+        )
+
+        resp = {
+            "ok": True,
+            "user": {
+                "id": tg_id,
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "language_code": language_code,
+                "is_premium": is_premium,
+            },
+        }
+        return Response(resp, status=status.HTTP_200_OK)

@@ -102,3 +102,21 @@ class CartDeleteItemSerializer(serializers.Serializer):
 
 class CartClearSerializer(serializers.Serializer):
     user_id = serializers.CharField()
+
+
+class TelegramWebAppAuthRequestSerializer(serializers.Serializer):
+    initData = serializers.CharField()
+
+
+class TelegramWebAppAuthUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField(allow_null=True, required=False)
+    first_name = serializers.CharField(allow_null=True, required=False)
+    last_name = serializers.CharField(allow_null=True, required=False)
+    language_code = serializers.CharField(allow_null=True, required=False)
+    is_premium = serializers.BooleanField(required=False)
+
+
+class TelegramWebAppAuthResponseSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
+    user = TelegramWebAppAuthUserSerializer()

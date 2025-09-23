@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CategoryTreeView, CategoryFlatView, ProductListView,
     BannerListView, CartView, CheckoutView,
-    InfoPageListView, InfoPageDetailView,
+    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView,
 )
 
 urlpatterns = [
@@ -12,6 +12,7 @@ urlpatterns = [
     path("banners/", BannerListView.as_view(), name="banners-list"),
     path("cart/", CartView.as_view(), name="cart"),
     path("cart/checkout/", CheckoutView.as_view(), name="cart-checkout"),
+    path("auth/telegram/", TelegramWebAppAuthView.as_view(), name="telegram-auth"),
 
     # если используешь инфо-разделы:
     path("info/", InfoPageListView.as_view(), name="info-list"),
