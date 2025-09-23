@@ -116,9 +116,7 @@ class InfoPage(models.Model):
         ABOUT = "about", "О нас"
         REVIEWS = "reviews", "Отзывы клиентов"
         WARRANTY = "warranty", "Гарантия"
-        RETURNS = "returns", "Возврат"
         DELIVERY = "delivery", "Доставка"
-        TG_CHANNEL = "tg_channel", "Наш Telegram канал"
 
     slug = models.CharField(
         "Ключ раздела",
