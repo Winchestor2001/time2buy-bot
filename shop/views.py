@@ -1,12 +1,16 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, filters, status
 from rest_framework.response import Response
 from django.db.models import Prefetch
+from rest_framework.views import APIView
 
 from .models import Category, Product, Banner, CartItem, InfoPage
+from .pagination import DefaultPagination
 from .serializers import (
     CategorySerializer, CategoryFlatSerializer,
     ProductSerializer, BannerSerializer, CartItemSerializer,
-    InfoPageSerializer,
+    InfoPageSerializer, CheckoutResponseSerializer, CheckoutRequestSerializer, CartChangeQuantitySerializer,
+    CartDeleteItemSerializer, CartClearSerializer,
 )
 
 # --- Категории ---
@@ -49,6 +53,7 @@ class ProductListView(generics.ListAPIView):
     search_fields = ["name", "description"]
     ordering_fields = ["id", "price", "name"]
     ordering = ["-id"]
+    pagination_class = DefaultPagination
 
     def get_queryset(self):
         qs = Product.objects.all().prefetch_related("sizes")
@@ -71,8 +76,11 @@ class BannerListView(generics.ListAPIView):
 
 class CartView(generics.ListCreateAPIView):
     """
-    GET  /api/cart/?user_id=...
-    POST /api/cart/ {user_id, product_id, quantity}
+    GET  /api/cart/?user_id=123
+    POST /api/cart/ {user_id, product_id, quantity}  -> инкремент (добавить к текущему)
+    PATCH /api/cart/ {user_id, product_id, delta}     -> изменить на ∆ (может быть отрицательным)
+    PUT   /api/cart/ {user_id, product_id, quantity}  -> установить новое кол-во (>=1)
+    DELETE /api/cart/ {user_id, product_id}           -> удалить позицию
     """
     serializer_class = CartItemSerializer
     permission_classes = [permissions.AllowAny]
@@ -81,35 +89,100 @@ class CartView(generics.ListCreateAPIView):
         user_id = self.request.query_params.get("user_id")
         return CartItem.objects.filter(user_id=user_id).select_related("product")
 
+    @extend_schema(
+        request=CartItemSerializer,  # по факту body: user_id, product_id, quantity
+        responses={201: CartItemSerializer},
+        examples=None,
+        description="Добавить товар в корзину (инкрементирует количество)."
+    )
     def create(self, request, *args, **kwargs):
         user_id = request.data.get("user_id")
         product_id = request.data.get("product_id")
-        quantity = int(request.data.get("quantity", 1))
+        quantity = int(request.data.get("quantity", 1) or 1)
         if not (user_id and product_id):
             return Response({"detail": "user_id и product_id обязательны"}, status=status.HTTP_400_BAD_REQUEST)
         item, _ = CartItem.objects.get_or_create(
-            user_id=user_id, product_id=product_id,
-            defaults={"quantity": 0}
+            user_id=user_id, product_id=product_id, defaults={"quantity": 0}
         )
         item.quantity = (item.quantity or 0) + max(quantity, 1)
         item.save()
         return Response({"ok": True, "id": item.id, "quantity": item.quantity}, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        request=CartChangeQuantitySerializer,
+        responses={200: CartItemSerializer},
+        description="Изменить количество на дельту (delta может быть отрицательным). Если после изменения количество <1 — позиция удаляется."
+    )
+    def patch(self, request, *args, **kwargs):
+        ser = CartChangeQuantitySerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        user_id = ser.validated_data["user_id"]
+        product_id = ser.validated_data["product_id"]
+        delta = ser.validated_data["delta"]
+
+        try:
+            item = CartItem.objects.get(user_id=user_id, product_id=product_id)
+        except CartItem.DoesNotExist:
+            return Response({"detail": "Позиция не найдена"}, status=status.HTTP_404_NOT_FOUND)
+
+        new_qty = (item.quantity or 0) + delta
+        if new_qty < 1:
+            item.delete()
+            return Response({"ok": True, "deleted": True}, status=status.HTTP_200_OK)
+
+        item.quantity = new_qty
+        item.save()
+        return Response({"ok": True, "id": item.id, "quantity": item.quantity}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=CartDeleteItemSerializer,
+        responses={200: dict},
+        description="Удалить конкретную позицию из корзины."
+    )
+    def delete(self, request, *args, **kwargs):
+        ser = CartDeleteItemSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        user_id = ser.validated_data["user_id"]
+        product_id = ser.validated_data["product_id"]
+
+        deleted, _ = CartItem.objects.filter(user_id=user_id, product_id=product_id).delete()
+        return Response({"ok": True, "deleted": bool(deleted)}, status=status.HTTP_200_OK)
+
+
+class CartClearView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=CartClearSerializer, responses={200: dict})
+    def delete(self, request):
+        ser = CartClearSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        user_id = ser.validated_data["user_id"]
+        deleted, _ = CartItem.objects.filter(user_id=user_id).delete()
+        return Response({"ok": True, "deleted_count": deleted}, status=status.HTTP_200_OK)
+
+
 class CheckoutView(generics.CreateAPIView):
     """
     POST /api/cart/checkout/ {user_id, seller_username?}
-    Возвращает содержимое корзины и redirect-ссылку на ЛС продавца.
     """
+    serializer_class = CheckoutRequestSerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(
+        request=CheckoutRequestSerializer,
+        responses={200: CheckoutResponseSerializer},
+    )
     def create(self, request, *args, **kwargs):
-        user_id = request.data.get("user_id")
-        seller_username = request.data.get("seller_username")
-        if not user_id:
-            return Response({"detail": "user_id обязателен"}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_id = serializer.validated_data["user_id"]
+        seller_username = serializer.validated_data.get("seller_username")
+
         items = CartItem.objects.filter(user_id=user_id).select_related("product")
         payload = CartItemSerializer(items, many=True, context={"request": request}).data
         link = f"https://t.me/{seller_username}" if seller_username else None
+
         return Response({"cart": payload, "redirect_to": link}, status=status.HTTP_200_OK)
 
 # --- InfoPage на generics (если используешь) ---

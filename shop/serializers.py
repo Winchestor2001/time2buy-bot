@@ -1,26 +1,48 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import Category, Product, ProductSize, Banner, CartItem, InfoPage
 
 class CategorySerializer(serializers.ModelSerializer):
     subcategories = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Category
         fields = ("id", "name", "image", "parent", "subcategories")
 
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))  # или ссылку на этот же сериализатор
     def get_subcategories(self, obj):
-        return CategorySerializer(obj.subcategories.all(), many=True, context=self.context).data
+        # верни сериализатор подкатегорий (если делаешь дерево)
+        qs = obj.subcategories.all()
+        return CategorySerializer(qs, many=True, context=self.context).data
+
+    @extend_schema_field(OpenApiTypes.URI)  # подсказка схеме, что это URL/None
+    def get_image(self, obj) -> str | None:
+        request = self.context.get("request")
+        if obj.image and request:
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
 
 class CategoryFlatSerializer(serializers.ModelSerializer):
-    parent_id = serializers.IntegerField(source="parent.id", read_only=True)
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
         fields = ("id", "name", "image", "parent_id")
 
-    def get_image(self, obj):
+    @extend_schema_field(OpenApiTypes.URI)  # подсказываем, что это URL (может быть null)
+    def get_image(self, obj) -> str | None:
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.image.url) if (request and obj.image) else None
+        if not obj.image:
+            return None
+        try:
+            url = obj.image.url
+        except ValueError:
+            # файл отсутствует/битый storage — безопасно вернём None
+            return None
+        return request.build_absolute_uri(url) if request else url
 
 class ProductSizeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -46,8 +68,37 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = ("id", "user_id", "product", "quantity")
 
+
+class CheckoutRequestSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    seller_username = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class CheckoutResponseSerializer(serializers.Serializer):
+    cart = CartItemSerializer(many=True)
+    redirect_to = serializers.URLField(allow_null=True, required=False)
+
+
 # Если используешь InfoPage:
 class InfoPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = InfoPage
         fields = ("id", "slug", "title", "external_url", "content")
+
+
+class CartSetQuantitySerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    product_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)  # установить точное новое кол-во (>=1)
+
+class CartChangeQuantitySerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    product_id = serializers.IntegerField()
+    delta = serializers.IntegerField()  # +1 / -1 / +3 / -5 и т.п.
+
+class CartDeleteItemSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+    product_id = serializers.IntegerField()
+
+class CartClearSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
