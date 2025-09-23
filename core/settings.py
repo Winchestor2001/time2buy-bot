@@ -28,9 +28,10 @@ SECRET_KEY = 'django-insecure-wg1#3os1+&-6_iyvq+nh6og(ihg#xcxvjf9x%1y-gcupe*mr4$
 DEBUG = True
 
 ALLOWED_HOSTS = ["time2buy.api.dizel.online", "localhost", "127.0.0.1"]
-CORS_ALLOWED_ORIGINS = [
-    "https://casual-store.netlify.app",
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "https://casual-store.netlify.app",
+# ]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
