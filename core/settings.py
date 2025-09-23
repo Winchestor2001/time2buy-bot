@@ -197,6 +197,12 @@ UNFOLD = {
                         "permission": lambda request: request.user.is_staff or request.user.is_superuser,
                     },
                     {
+                        "title": "Каналы/группы для подписки",
+                        "icon": "subscriptions",
+                        "link": get_reverse_link(app_name="users", model_name="subscriptionchannel"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
+                    {
                         "title": "Админы",
                         "icon": "shield_person",
                         "link": get_reverse_link(app_name="auth", model_name="user"),
