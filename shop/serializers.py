@@ -50,4 +50,4 @@ class CartItemSerializer(serializers.ModelSerializer):
 class InfoPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = InfoPage
-        fields = ("id", "slug", "title", "telegraph_url", "external_url", "body")
+        fields = ("id", "slug", "title", "external_url", "content")

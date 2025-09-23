@@ -1,4 +1,6 @@
 from django.db import models
+from tinymce.models import HTMLField
+
 from users.models import TelegramUser
 
 
@@ -127,9 +129,8 @@ class InfoPage(models.Model):
         help_text="Системный ключ раздела",
     )
     title = models.CharField("Заголовок", max_length=120)
-    telegraph_url = models.URLField("Ссылка на статью (Telegraph)", blank=True, null=True)
-    external_url = models.URLField("Внешняя ссылка", blank=True, null=True)
-    body = models.TextField("Текстовый контент", blank=True, null=True)
+    external_url = models.URLField("Внешняя ссылка", help_text="Внешняя ссылка на страницу", blank=True, null=True)
+    content = HTMLField("Контент", blank=True, null=True)
 
     is_active = models.BooleanField("Активен", default=True)
     sort_order = models.PositiveIntegerField("Порядок сортировки", default=0)

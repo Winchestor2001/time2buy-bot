@@ -122,7 +122,7 @@ class InfoPageListView(generics.ListAPIView):
     serializer_class = InfoPageSerializer
     permission_classes = [permissions.AllowAny]
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
-    search_fields = ["title", "slug"]
+    search_fields = ["title", "slug", "external_url"]
     ordering_fields = ["sort_order", "title", "updated_at"]
     ordering = ["sort_order", "title"]
 

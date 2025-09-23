@@ -27,8 +27,11 @@ SECRET_KEY = 'django-insecure-wg1#3os1+&-6_iyvq+nh6og(ihg#xcxvjf9x%1y-gcupe*mr4$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["195.58.34.31", "localhost", "127.0.0.1"]
-
+ALLOWED_HOSTS = ["time2buy.api.dizel.online", "localhost", "127.0.0.1"]
+CORS_ALLOWED_ORIGINS = [
+    "https://casual-store.netlify.app",
+]
+CORS_ALLOW_CREDENTIALS = True
 
 # Application definition
 
@@ -43,6 +46,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'drf_spectacular_sidecar',
+    'tinymce',
+    'corsheaders',
 
     'shop',
     'users',
@@ -52,6 +57,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -172,15 +178,7 @@ UNFOLD = {
             "800": "#0c1f55",
             "900": "#07112f",
             "950": "#030617",
-        },
-        "font": {
-            "subtle-light": "var(--color-primary-400)",
-            "subtle-dark": "var(--color-primary-300)",
-            "default-light": "var(--color-primary-600)",
-            "default-dark": "var(--color-primary-200)",
-            "important-light": "var(--color-primary-900)",
-            "important-dark": "var(--color-primary-100)",
-        },
+        }
     },
     "SIDEBAR": {
         "show_search": True,
@@ -239,4 +237,19 @@ UNFOLD = {
             },
         ]
     }
+}
+
+TINYMCE_DEFAULT_CONFIG = {
+    "menubar": False,
+    "plugins": "link lists table code autoresize",
+    "toolbar": (
+        "undo redo | styles | bold italic underline | "
+        "alignleft aligncenter alignright | bullist numlist | "
+        "link table | code"
+    ),
+    "language": "ru",
+    "content_style": "body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }",
+    "height": 700,
+    "autoresize_min_height": 700,
+    "autoresize_max_height": 1200,
 }

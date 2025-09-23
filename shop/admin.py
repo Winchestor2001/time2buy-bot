@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
+from tinymce.models import HTMLField
+from tinymce.widgets import TinyMCE
 from unfold.admin import ModelAdmin, TabularInline  # классы из django-unfold
 
 from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage
@@ -132,14 +134,17 @@ class CartItemAdmin(ModelAdmin):
 
 @admin.register(InfoPage)
 class InfoPageAdmin(ModelAdmin):
-    list_display = ("id", "slug", "title", "telegraph_url", "external_url", "is_active", "sort_order", "updated_at")
-    list_display_links = ("slug", "title", "telegraph_url", "external_url")
+    list_display = ("id", "slug", "title", "content", "is_active", "sort_order", "updated_at")
+    list_display_links = ("slug", "title")
     list_editable = ("is_active", "sort_order")
     list_filter = ("is_active", "slug")
-    search_fields = ("title", "telegraph_url", "external_url")
+    search_fields = ("title", "external_url", "content")
     ordering = ("sort_order", "title")
     fieldsets = (
-        ("Основное", {"fields": ("slug", "title", "is_active", "sort_order")}),
-        ("Ссылки", {"fields": ("telegraph_url", "external_url")}),
-        ("Контент (опционально)", {"fields": ("body",)}),
+        ("Основное", {"fields": ("slug", "title", "external_url", "is_active", "sort_order")}),
+        ("Контент", {"fields": ("content",)}),
     )
+
+    formfield_overrides = {
+        HTMLField: {'widget': TinyMCE(attrs={'cols': 80, 'rows': 30})},
+    }
