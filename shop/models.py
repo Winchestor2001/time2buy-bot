@@ -53,7 +53,6 @@ class ProductSize(models.Model):
         on_delete=models.CASCADE,
     )
     label = models.CharField("Размер", max_length=40)  # 39, 40, 41...
-    price_delta = models.DecimalField("Наценка к цене", max_digits=12, decimal_places=2, default=0)
 
     class Meta:
         verbose_name = "Размер"

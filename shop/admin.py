@@ -26,7 +26,7 @@ def _img_thumb(obj, field="image", h=40):
 class ProductSizeInline(TabularInline):
     model = ProductSize
     extra = 0
-    fields = ("label", "price_delta")
+    fields = ("label",)
     classes = ("collapse",)       # компактнее с Unfold
     show_change_link = True
 
@@ -94,7 +94,7 @@ class ProductAdmin(ModelAdmin):
 
 @admin.register(ProductSize)
 class ProductSizeAdmin(ModelAdmin):
-    list_display = ("id", "product", "label", "price_delta")
+    list_display = ("id", "product", "label",)
     list_display_links = ("product", "label")
     list_filter = ("product",)
     search_fields = ("product__name", "label")

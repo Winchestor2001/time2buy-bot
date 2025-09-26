@@ -47,7 +47,7 @@ class CategoryFlatSerializer(serializers.ModelSerializer):
 class ProductSizeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductSize
-        fields = ("id", "label", "price_delta")
+        fields = ("id", "label")
 
 class ProductSerializer(serializers.ModelSerializer):
     sizes = ProductSizeSerializer(many=True, read_only=True)
