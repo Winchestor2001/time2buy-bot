@@ -2,13 +2,14 @@ from django.urls import path
 from .views import (
     CategoryTreeView, CategoryFlatView, ProductListView,
     BannerListView, CartView, CheckoutView,
-    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView,
+    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView, ProductDetailView,
 )
 
 urlpatterns = [
     path("categories/", CategoryTreeView.as_view(), name="categories-tree"),
     path("categories/flat/", CategoryFlatView.as_view(), name="categories-flat"),
     path("products/", ProductListView.as_view(), name="products-list"),
+    path("products/<int:pk>/", ProductDetailView.as_view(), name="products-detail"),
     path("banners/", BannerListView.as_view(), name="banners-list"),
     path("cart/", CartView.as_view(), name="cart"),
     path("cart/checkout/", CheckoutView.as_view(), name="cart-checkout"),

@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, filters, status
 from rest_framework.response import Response
-from django.db.models import Prefetch
+from django.db.models import Prefetch, QuerySet
 from rest_framework.views import APIView
 
 from bot.config import BOT_TOKEN
@@ -50,22 +50,46 @@ class CategoryFlatView(generics.ListAPIView):
 
 class ProductListView(generics.ListAPIView):
     """
-    GET /api/products/?category_id=...
+    GET /api/products/?category_id=...&sort=new|cheap|expensive
     """
     serializer_class = ProductSerializer
     permission_classes = [permissions.AllowAny]
-    filter_backends = [filters.OrderingFilter, filters.SearchFilter]
+    filter_backends = [filters.SearchFilter]   # оставляем только поиск
     search_fields = ["name", "description"]
-    ordering_fields = ["id", "price", "name"]
-    ordering = ["-id"]
     pagination_class = DefaultPagination
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
         qs = Product.objects.all().prefetch_related("sizes")
+
+        # --- фильтр по категории ---
         category_id = self.request.query_params.get("category_id")
         if category_id:
             qs = qs.filter(category_id=category_id)
+
+        # --- сортировка ---
+        sort = self.request.query_params.get("sort")
+        if sort == "cheap":
+            qs = qs.order_by("price")
+        elif sort == "expensive":
+            qs = qs.order_by("-price")
+        else:  # new (по умолчанию)
+            qs = qs.order_by("-id")
+
         return qs
+
+
+class ProductDetailView(generics.RetrieveAPIView):
+    """
+    GET /api/products/<id>/
+    """
+    queryset = Product.objects.all().prefetch_related("sizes")
+    serializer_class = ProductSerializer   # или ProductSerializer
+    permission_classes = [permissions.AllowAny]
+    lookup_field = "pk"
+
+    @extend_schema(summary="Получить продукт по ID")
+    def get(self, *args, **kwargs):
+        return super().get(*args, **kwargs)
 
 # --- Баннеры ---
 
