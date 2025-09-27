@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
     'tinymce',
     'corsheaders',
+    'unfold.contrib.import_export',
+    'import_export',
 
     'shop',
     'users',

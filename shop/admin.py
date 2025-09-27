@@ -5,6 +5,9 @@ from tinymce.widgets import TinyMCE
 from unfold.admin import ModelAdmin, TabularInline  # классы из django-unfold
 
 from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage
+from import_export.admin import ImportExportModelAdmin
+from unfold.contrib.import_export.forms import ExportForm, ImportForm, SelectableFieldsExportForm
+
 
 
 # ---------- helpers ----------
@@ -56,7 +59,9 @@ class CategoryAdmin(ModelAdmin):
 
 
 @admin.register(Product)
-class ProductAdmin(ModelAdmin):
+class ProductAdmin(ModelAdmin, ImportExportModelAdmin):
+    import_form_class = ImportForm
+    export_form_class = ExportForm
     list_display = ("id", "name", "category", "price", "old_price", "image_thumb")
     list_display_links = ("name",)
     search_fields = ("name", "description")
