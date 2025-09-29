@@ -83,10 +83,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    tg_user_id = serializers.IntegerField(source="tg_user.tg_id", read_only=True)
+    tg_username = serializers.CharField(source="tg_user.username", read_only=True)
 
     class Meta:
         model = Order
-        fields = ("id", "user_id", "status", "total_amount", "created_at", "items")
+        fields = ("id", "tg_user_id", "tg_username", "status", "total_amount", "created_at", "items")
 
 
 class CheckoutResponseSerializer(serializers.Serializer):

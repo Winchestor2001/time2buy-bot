@@ -213,21 +213,19 @@ class CheckoutView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
-
         user_id = ser.validated_data["user_id"]
 
-        # Берём все позиции корзины пользователя
-        items_qs = (
-            CartItem.objects
-            .filter(user_id=user_id)
-            .select_related("product")
-        )
+        # найдём TG-пользователя (если не был сохранён — создадим «пустышку»)
+        tg_user, _ = TelegramUser.objects.get_or_create(tg_id=int(user_id))
+
+        # корзина
+        items_qs = CartItem.objects.filter(user_id=user_id).select_related("product")
         items = list(items_qs)
         if not items:
             return Response({"detail": "Корзина пуста."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Создаём заказ
-        order = Order.objects.create(user_id=user_id)
+        # заказ
+        order = Order.objects.create(tg_user=tg_user)
 
         total = Decimal("0")
         bulk = []
@@ -235,25 +233,25 @@ class CheckoutView(generics.CreateAPIView):
             price = ci.product.price or Decimal("0")
             total += price * ci.quantity
             bulk.append(OrderItem(order=order, product=ci.product, quantity=ci.quantity, price=price))
-
         OrderItem.objects.bulk_create(bulk)
         order.total_amount = total
         order.save(update_fields=["total_amount"])
 
-        # Чистим корзину
+        # чистим корзину
         items_qs.delete()
 
-        # Уведомляем админов с ссылкой в админку
+        # уведомление админам
         try:
             admin_url = request.build_absolute_uri(reverse("admin:shop_order_change", args=[order.id]))
         except Exception:
             admin_url = f"(admin link unavailable, id={order.id})"
 
+        username = tg_user.username and f"@{tg_user.username.lstrip('@')}" or "—"
         notify_admins(
             "\n".join(
                 [
                     f"🆕 <b>Новый заказ #{order.id}</b>",
-                    f"👤 user_id: <code>{user_id}</code>",
+                    f"👤 tg_id: <code>{tg_user.tg_id}</code> | {username}",
                     f"🧾 позиций: {len(bulk)}",
                     f"💰 сумма: <b>{order.total_amount}</b>",
                     f"🔗 {admin_url}",

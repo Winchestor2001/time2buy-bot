@@ -161,11 +161,12 @@ class OrderItemInline(admin.TabularInline):
     readonly_fields = ("product", "quantity", "price")
     can_delete = False
 
+
 @admin.register(Order)
 class OrderAdmin(ModelAdmin):
-    list_display = ("id", "user_id", "status", "total_amount", "created_at")
+    list_display = ("id", "tg_user", "status", "total_amount", "created_at")
     list_filter = ("status",)
-    search_fields = ("user_id", "id")
+    search_fields = ("tg_user__tg_id", "id")
     ordering = ("-id",)
     inlines = (OrderItemInline,)
     readonly_fields = ("created_at", "updated_at", "total_amount")

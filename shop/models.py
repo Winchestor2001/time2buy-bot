@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.html import format_html
 from tinymce.models import HTMLField
 
 from users.models import TelegramUser
@@ -151,11 +152,15 @@ class Order(models.Model):
         DONE = "done", "Выполнен"
         CANCELED = "canceled", "Отменён"
 
-    user_id = models.CharField("TG user_id", max_length=64, db_index=True)
+    tg_user = models.ForeignKey(
+        TelegramUser,
+        verbose_name="TG пользователь",
+        on_delete=models.PROTECT,   # заказ не должен терять привязку к покупателю
+        related_name="orders",
+        db_index=True,
+    )
     status = models.CharField("Статус", max_length=20, choices=Status.choices, default=Status.NEW)
-
     total_amount = models.DecimalField("Сумма, ₽", max_digits=12, decimal_places=2, default=0)
-
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлён", auto_now=True)
 
@@ -165,7 +170,23 @@ class Order(models.Model):
         verbose_name_plural = "Заказы"
 
     def __str__(self):
-        return f"Заказ #{self.id} (user {self.user_id})"
+        return f"Заказ #{self.id} (tg_id={self.tg_user.tg_id})"
+
+    # Удобная ссылка «написать в ЛС»:
+    def dm_link(self):
+        """
+        Возвращает HTML-ссылку для перехода в ЛС:
+        - если есть username -> https://t.me/<username>
+        - иначе deep link по id -> tg://user?id=<tg_id>
+        """
+        if self.tg_user and self.tg_user.username:
+            url = f"https://t.me/{self.tg_user.username.lstrip('@')}"
+            text = f"@{self.tg_user.username.lstrip('@')}"
+        else:
+            url = f"tg://user?id={self.tg_user.tg_id}"
+            text = f"id:{self.tg_user.tg_id}"
+        return format_html('<a href="{}" target="_blank">Написать {}</a>', url, text)
+    dm_link.short_description = "ЛС покупателя"
 
 
 class OrderItem(models.Model):
