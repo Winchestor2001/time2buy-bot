@@ -142,3 +142,42 @@ class InfoPage(models.Model):
 
     def __str__(self):
         return f"{self.get_slug_display()} — {self.title}"
+
+
+class Order(models.Model):
+    class Status(models.TextChoices):
+        NEW = "new", "Новый"
+        IN_PROGRESS = "in_progress", "В работе"
+        DONE = "done", "Выполнен"
+        CANCELED = "canceled", "Отменён"
+
+    user_id = models.CharField("TG user_id", max_length=64, db_index=True)
+    status = models.CharField("Статус", max_length=20, choices=Status.choices, default=Status.NEW)
+
+    total_amount = models.DecimalField("Сумма, ₽", max_digits=12, decimal_places=2, default=0)
+    note = models.TextField("Комментарий клиента", blank=True, null=True)
+
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлён", auto_now=True)
+
+    class Meta:
+        ordering = ("-id",)
+        verbose_name = "Заказ"
+        verbose_name_plural = "Заказы"
+
+    def __str__(self):
+        return f"Заказ #{self.id} (user {self.user_id})"
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
+    product = models.ForeignKey("shop.Product", on_delete=models.PROTECT)
+    quantity = models.PositiveIntegerField(default=1)
+    price = models.DecimalField("Цена на момент заказа", max_digits=12, decimal_places=2)
+
+    class Meta:
+        verbose_name = "Позиция заказа"
+        verbose_name_plural = "Позиции заказа"
+
+    def __str__(self):
+        return f"{self.product} x{self.quantity}"

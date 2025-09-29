@@ -1,13 +1,13 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.utils.safestring import mark_safe
 from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
 from unfold.admin import ModelAdmin, TabularInline  # классы из django-unfold
 
-from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage
+from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem
 from import_export.admin import ImportExportModelAdmin
-from unfold.contrib.import_export.forms import ExportForm, ImportForm, SelectableFieldsExportForm
-
+from unfold.contrib.import_export.forms import ExportForm, ImportForm
 
 
 # ---------- helpers ----------
@@ -153,3 +153,19 @@ class InfoPageAdmin(ModelAdmin):
     formfield_overrides = {
         HTMLField: {'widget': TinyMCE(attrs={'cols': 80, 'rows': 30})},
     }
+
+
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    readonly_fields = ("product", "quantity", "price")
+    can_delete = False
+
+@admin.register(Order)
+class OrderAdmin(ModelAdmin):
+    list_display = ("id", "user_id", "status", "total_amount", "created_at")
+    list_filter = ("status",)
+    search_fields = ("user_id", "id")
+    ordering = ("-id",)
+    inlines = (OrderItemInline,)
+    readonly_fields = ("created_at", "updated_at", "total_amount")

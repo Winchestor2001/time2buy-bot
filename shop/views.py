@@ -1,19 +1,24 @@
+from decimal import Decimal
+
+from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, filters, status
 from rest_framework.response import Response
 from django.db.models import Prefetch, QuerySet
+from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
 from bot.config import BOT_TOKEN
+from core.utils import notify_admins
 from users.models import TelegramUser
-from .models import Category, Product, Banner, CartItem, InfoPage
+from .models import Category, Product, Banner, CartItem, InfoPage, OrderItem, Order
 from .pagination import DefaultPagination
 from .serializers import (
     CategorySerializer, CategoryFlatSerializer,
     ProductSerializer, BannerSerializer, CartItemSerializer,
     InfoPageSerializer, CheckoutResponseSerializer, CheckoutRequestSerializer, CartChangeQuantitySerializer,
     CartDeleteItemSerializer, CartClearSerializer, TelegramWebAppAuthRequestSerializer,
-    TelegramWebAppAuthResponseSerializer,
+    TelegramWebAppAuthResponseSerializer, OrderSerializer,
 )
 from .telegram_auth import verify_telegram_init_data
 
@@ -192,27 +197,72 @@ class CartClearView(APIView):
 
 class CheckoutView(generics.CreateAPIView):
     """
-    POST /api/cart/checkout/ {user_id, seller_username?}
+    POST /api/cart/checkout/
+    body: { user_id: "...", cart_item_ids?: [1,2,...], note?: "..." }
     """
     serializer_class = CheckoutRequestSerializer
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
         request=CheckoutRequestSerializer,
-        responses={200: CheckoutResponseSerializer},
+        responses={200: OrderSerializer},
     )
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        data = self.get_serializer(data=request.data)
+        data.is_valid(raise_exception=True)
 
-        user_id = serializer.validated_data["user_id"]
-        seller_username = serializer.validated_data.get("seller_username")
+        user_id = data.validated_data["user_id"]
+        cart_ids = data.validated_data.get("cart_item_ids") or []
+        note = data.validated_data.get("note", "")
 
-        items = CartItem.objects.filter(user_id=user_id).select_related("product")
-        payload = CartItemSerializer(items, many=True, context={"request": request}).data
-        link = f"https://t.me/{seller_username}" if seller_username else None
+        qs = CartItem.objects.filter(user_id=user_id).select_related("product")
+        if cart_ids:
+            qs = qs.filter(id__in=cart_ids)
 
-        return Response({"cart": payload, "redirect_to": link}, status=status.HTTP_200_OK)
+        items = list(qs)
+        if not items:
+            return Response({"detail": "Корзина пуста."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # создаём заказ
+        order = Order.objects.create(user_id=user_id, note=note)
+
+        total = Decimal("0")
+        bulk_order_items = []
+        for ci in items:
+            price = ci.product.price or Decimal("0")
+            total += price * ci.quantity
+            bulk_order_items.append(
+                OrderItem(order=order, product=ci.product, quantity=ci.quantity, price=price)
+            )
+        OrderItem.objects.bulk_create(bulk_order_items)
+        order.total_amount = total
+        order.save(update_fields=["total_amount"])
+
+        # чистим корзину
+        CartItem.objects.filter(id__in=[i.id for i in items]).delete()
+
+        # уведомляем админов
+        # ссылка на заказ в админке:
+        # admin: app_label_modelname_change, у нас shop_order_change
+        try:
+            admin_url = request.build_absolute_uri(
+                reverse("admin:shop_order_change", args=[order.id])
+            )
+        except Exception:
+            admin_url = f"(нет reverse admin, id={order.id})"
+
+        lines = [f"🆕 <b>Новый заказ #{order.id}</b>",
+                 f"👤 user_id: <code>{user_id}</code>",
+                 f"🧾 позиций: {len(bulk_order_items)}",
+                 f"💰 сумма: <b>{order.total_amount}</b>"]
+        if note:
+            lines.append(f"📝 комментарий: {note}")
+        lines.append(f"🔗 {admin_url}")
+
+        notify_admins("\n".join(lines))
+
+        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
 # --- InfoPage на generics (если используешь) ---
 

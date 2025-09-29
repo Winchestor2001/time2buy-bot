@@ -1,7 +1,8 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import Category, Product, ProductSize, Banner, CartItem, InfoPage
+from .models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem
+
 
 class CategorySerializer(serializers.ModelSerializer):
     subcategories = serializers.SerializerMethodField()
@@ -71,7 +72,26 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 class CheckoutRequestSerializer(serializers.Serializer):
     user_id = serializers.CharField()
-    seller_username = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    cart_item_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, allow_empty=True,
+        help_text="Если передать — оформим заказ только по этим позициям корзины. Иначе возьмём всю корзину пользователя.",
+    )
+    note = serializers.CharField(required=False, allow_blank=True)
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    image = serializers.ImageField(source="product.image", read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ("id", "product", "product_name", "image", "quantity", "price")
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ("id", "user_id", "status", "total_amount", "note", "created_at", "items")
 
 
 class CheckoutResponseSerializer(serializers.Serializer):

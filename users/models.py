@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -97,3 +98,42 @@ class SubscriptionChannel(models.Model):
         if self.username:
             return f"https://t.me/{self.username}"
         return self.invite_link
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile",
+        verbose_name="Пользователь",
+    )
+    telegram_id = models.BigIntegerField("Telegram ID", blank=True, null=True, db_index=True)
+    telegram_username = models.CharField("Username без @", max_length=64, blank=True, null=True)
+    receive_bot_notifications = models.BooleanField(
+        "Получать уведомления в Telegram", default=True
+    )
+
+    class Meta:
+        verbose_name = "Профиль пользователя"
+        verbose_name_plural = "Профили пользователей"
+
+    def __str__(self):
+        return f"Профиль {self.user} (tg_id={self.telegram_id})"
+
+
+class TelegramAdmin(models.Model):
+    username = models.CharField("Username без @", max_length=64, blank=True, null=True, db_index=True)
+    telegram_id = models.BigIntegerField("Telegram ID", unique=True, db_index=True, help_text="Уникальный идентификатор администратора в Telegram (@raw_data_bot)")
+
+    is_active = models.BooleanField("Активен", default=True,
+                                    help_text="Если выключено — уведомления администратору не будут отправляться")
+
+    created_at = models.DateTimeField("Дата создания", auto_now_add=True)
+    updated_at = models.DateTimeField("Дата обновления", auto_now=True)
+
+    class Meta:
+        verbose_name = "TG админ"
+        verbose_name_plural = "TG админы"
+
+    def __str__(self):
+        return f"{self.username or self.telegram_id}"

@@ -1,4 +1,13 @@
+import asyncio
+
+from aiogram import Bot
+from aiogram.client.default import DefaultBotProperties
+from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest, TelegramForbiddenError
 from django import forms
+from django.conf import settings
+
+from bot.config import BOT_TOKEN
+from users.models import TelegramAdmin
 
 BUTTONS_HELP = (
     "Инлайн-кнопки в формате: каждая кнопка с новой строки, «Текст | URL». Пример:\n"
@@ -36,4 +45,55 @@ class BroadcastForm(forms.Form):
             self.add_error("text", "Нужен текст для текстового сообщения.")
         if mtype != "text" and not file:
             self.add_error("file", "Для этого типа нужен загруженный файл.")
+        return cleaned
+
+
+class TelegramAdminForm(forms.ModelForm):
+    class Meta:
+        model = TelegramAdmin
+        fields = ("username", "telegram_id", "is_active")
+
+    def clean(self):
+        cleaned = super().clean()
+        username = (cleaned.get("username") or "").strip().lstrip("@")
+        telegram_id = cleaned.get("telegram_id")
+
+        # Нечего резолвить
+        if telegram_id or not username:
+            return cleaned
+
+        token = BOT_TOKEN
+        if not token:
+            raise forms.ValidationError("BOT_TOKEN не задан в настройках проекта.")
+
+        async def _resolve():
+            bot = Bot(token, default=DefaultBotProperties(parse_mode="HTML"))
+            try:
+                # get_chat принимает @username
+                chat = await bot.get_chat(f"@{username}")
+                return chat.id
+            finally:
+                await bot.session.close()
+
+        # Запускаем асинхронный вызов безопасно из формы
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        try:
+            if loop and loop.is_running():
+                # редко для админки, но на всякий случай
+                resolved_id = loop.run_until_complete(_resolve())  # type: ignore[attr-defined]
+            else:
+                resolved_id = asyncio.run(_resolve())
+        except TelegramRetryAfter as e:
+            raise forms.ValidationError(f"Telegram ограничил запрос. Повторите позже: retry_after={getattr(e, 'retry_after', 3)}с")
+        except (TelegramBadRequest, TelegramForbiddenError) as e:
+            raise forms.ValidationError(f"Не удалось получить ID по username @{username}: {e}")
+        except Exception as e:  # noqa: BLE001
+            raise forms.ValidationError(f"Ошибка при определении telegram_id: {e}")
+
+        cleaned["telegram_id"] = resolved_id
+        cleaned["username"] = username
         return cleaned
