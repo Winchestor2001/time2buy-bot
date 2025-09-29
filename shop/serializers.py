@@ -71,12 +71,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
 class CheckoutRequestSerializer(serializers.Serializer):
-    user_id = serializers.CharField()
-    cart_item_ids = serializers.ListField(
-        child=serializers.IntegerField(), required=False, allow_empty=True,
-        help_text="Если передать — оформим заказ только по этим позициям корзины. Иначе возьмём всю корзину пользователя.",
-    )
-    note = serializers.CharField(required=False, allow_blank=True)
+    user_id = serializers.CharField(help_text="Telegram user_id из WebApp.initData")
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -91,7 +86,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ("id", "user_id", "status", "total_amount", "note", "created_at", "items")
+        fields = ("id", "user_id", "status", "total_amount", "created_at", "items")
 
 
 class CheckoutResponseSerializer(serializers.Serializer):

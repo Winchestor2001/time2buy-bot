@@ -155,7 +155,6 @@ class Order(models.Model):
     status = models.CharField("Статус", max_length=20, choices=Status.choices, default=Status.NEW)
 
     total_amount = models.DecimalField("Сумма, ₽", max_digits=12, decimal_places=2, default=0)
-    note = models.TextField("Комментарий клиента", blank=True, null=True)
 
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлён", auto_now=True)

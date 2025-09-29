@@ -198,69 +198,68 @@ class CartClearView(APIView):
 class CheckoutView(generics.CreateAPIView):
     """
     POST /api/cart/checkout/
-    body: { user_id: "...", cart_item_ids?: [1,2,...], note?: "..." }
+    body: { user_id: "..." }
     """
     serializer_class = CheckoutRequestSerializer
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(
+        summary="Оформление заказа из всей корзины пользователя",
         request=CheckoutRequestSerializer,
-        responses={200: OrderSerializer},
+        responses={200: OrderSerializer, 400: dict},
+        tags=["cart"],
     )
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        data = self.get_serializer(data=request.data)
-        data.is_valid(raise_exception=True)
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
 
-        user_id = data.validated_data["user_id"]
-        cart_ids = data.validated_data.get("cart_item_ids") or []
-        note = data.validated_data.get("note", "")
+        user_id = ser.validated_data["user_id"]
 
-        qs = CartItem.objects.filter(user_id=user_id).select_related("product")
-        if cart_ids:
-            qs = qs.filter(id__in=cart_ids)
-
-        items = list(qs)
+        # Берём все позиции корзины пользователя
+        items_qs = (
+            CartItem.objects
+            .filter(user_id=user_id)
+            .select_related("product")
+        )
+        items = list(items_qs)
         if not items:
             return Response({"detail": "Корзина пуста."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # создаём заказ
-        order = Order.objects.create(user_id=user_id, note=note)
+        # Создаём заказ
+        order = Order.objects.create(user_id=user_id)
 
         total = Decimal("0")
-        bulk_order_items = []
+        bulk = []
         for ci in items:
             price = ci.product.price or Decimal("0")
             total += price * ci.quantity
-            bulk_order_items.append(
-                OrderItem(order=order, product=ci.product, quantity=ci.quantity, price=price)
-            )
-        OrderItem.objects.bulk_create(bulk_order_items)
+            bulk.append(OrderItem(order=order, product=ci.product, quantity=ci.quantity, price=price))
+
+        OrderItem.objects.bulk_create(bulk)
         order.total_amount = total
         order.save(update_fields=["total_amount"])
 
-        # чистим корзину
-        CartItem.objects.filter(id__in=[i.id for i in items]).delete()
+        # Чистим корзину
+        items_qs.delete()
 
-        # уведомляем админов
-        # ссылка на заказ в админке:
-        # admin: app_label_modelname_change, у нас shop_order_change
+        # Уведомляем админов с ссылкой в админку
         try:
-            admin_url = request.build_absolute_uri(
-                reverse("admin:shop_order_change", args=[order.id])
-            )
+            admin_url = request.build_absolute_uri(reverse("admin:shop_order_change", args=[order.id]))
         except Exception:
-            admin_url = f"(нет reverse admin, id={order.id})"
+            admin_url = f"(admin link unavailable, id={order.id})"
 
-        lines = [f"🆕 <b>Новый заказ #{order.id}</b>",
-                 f"👤 user_id: <code>{user_id}</code>",
-                 f"🧾 позиций: {len(bulk_order_items)}",
-                 f"💰 сумма: <b>{order.total_amount}</b>"]
-        if note:
-            lines.append(f"📝 комментарий: {note}")
-        lines.append(f"🔗 {admin_url}")
-
-        notify_admins("\n".join(lines))
+        notify_admins(
+            "\n".join(
+                [
+                    f"🆕 <b>Новый заказ #{order.id}</b>",
+                    f"👤 user_id: <code>{user_id}</code>",
+                    f"🧾 позиций: {len(bulk)}",
+                    f"💰 сумма: <b>{order.total_amount}</b>",
+                    f"🔗 {admin_url}",
+                ]
+            )
+        )
 
         return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
 
