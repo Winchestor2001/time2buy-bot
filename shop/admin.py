@@ -90,9 +90,9 @@ class ProductAdmin(ModelAdmin, ImportExportModelAdmin):
         ("Цены", {
             "fields": ("price", "old_price"),
         }),
-        ("Медиа", {
-            "fields": ("image", "image_thumb_large"),
-        }),
+        # ("Медиа", {
+        #     "fields": ("image", "image_thumb_large"),
+        # }),
     )
     readonly_fields = ("image_thumb_large",)
 
