@@ -5,7 +5,7 @@ from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
 from unfold.admin import ModelAdmin, TabularInline  # классы из django-unfold
 
-from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem
+from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem, ProductImage
 from import_export.admin import ImportExportModelAdmin
 from unfold.contrib.import_export.forms import ExportForm, ImportForm
 
@@ -58,6 +58,17 @@ class CategoryAdmin(ModelAdmin):
     image_thumb_large.short_description = "Превью"
 
 
+class ProductImageInline(TabularInline):
+    model = ProductImage
+    extra = 0
+    fields = ("preview", "image", "is_main", "sort_order")
+    readonly_fields = ("preview",)
+
+    def preview(self, obj):
+        return _img_thumb(obj.image, h=60)
+    preview.short_description = "Превью"
+
+
 @admin.register(Product)
 class ProductAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
@@ -69,7 +80,7 @@ class ProductAdmin(ModelAdmin, ImportExportModelAdmin):
     ordering = ("-id",)
     list_per_page = 25
 
-    inlines = (ProductSizeInline,)
+    inlines = (ProductSizeInline, ProductImageInline)
 
     # удобные группы полей (Unfold делает их аккуратными)
     fieldsets = (
@@ -87,6 +98,10 @@ class ProductAdmin(ModelAdmin, ImportExportModelAdmin):
 
     # автодополнение по категории (ускоряет формы)
     autocomplete_fields = ("category",)
+
+    formfield_overrides = {
+        HTMLField: {'widget': TinyMCE(attrs={'cols': 80, 'rows': 30})},
+    }
 
     def image_thumb(self, obj):
         return _img_thumb(obj, "image", h=32)
@@ -146,7 +161,7 @@ class InfoPageAdmin(ModelAdmin):
     search_fields = ("title", "external_url", "content")
     ordering = ("sort_order", "title")
     fieldsets = (
-        ("Основное", {"fields": ("slug", "title", "external_url", "is_active", "sort_order")}),
+        ("Основное", {"fields": ("slug", "title", "external_url", "is_active", "sort_order", "image")}),
         ("Контент", {"fields": ("content",)}),
     )
 

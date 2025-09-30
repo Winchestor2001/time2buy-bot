@@ -26,10 +26,10 @@ class Category(models.Model):
 
 class Product(models.Model):
     name = models.CharField("Название", max_length=160)
-    description = models.TextField("Описание", blank=True, null=True)
+    description = HTMLField("Описание", blank=True, null=True)
     price = models.DecimalField("Цена", max_digits=12, decimal_places=2)
     old_price = models.DecimalField("Старая цена", max_digits=12, decimal_places=2, blank=True, null=True)
-    image = models.ImageField("Изображение", upload_to="products/", blank=True, null=True)
+    image = models.ImageField("Главное изображение", upload_to="products/", blank=True, null=True)
     category = models.ForeignKey(
         Category,
         verbose_name="Категория",
@@ -44,6 +44,36 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    def main_image_url(self):
+        """
+        URL главного изображения: сначала gallery (is_main / sort_order), иначе legacy image.
+        """
+        pic = self.images.order_by("-is_main", "sort_order", "id").first()
+        try:
+            return pic.image.url if pic else (self.image.url if self.image else None)
+        except Exception:
+            return None
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(
+        Product,
+        related_name="images",
+        on_delete=models.CASCADE,
+        verbose_name="Товар",
+    )
+    image = models.ImageField("Изображение", upload_to="products/")
+    is_main = models.BooleanField("Главное", default=False)
+    sort_order = models.PositiveIntegerField("Порядок", default=0)
+
+    class Meta:
+        verbose_name = "Фото товара"
+        verbose_name_plural = "Фото товара"
+        ordering = ("-is_main", "sort_order", "id")
+
+    def __str__(self):
+        return f"{self.product.name} [{self.image.name}]"
 
 
 class ProductSize(models.Model):
@@ -128,6 +158,7 @@ class InfoPage(models.Model):
     )
     title = models.CharField("Заголовок", max_length=120)
     external_url = models.URLField("Внешняя ссылка", help_text="Внешняя ссылка на страницу", blank=True, null=True)
+    image = models.ImageField("Изображение", upload_to="info_pages/", blank=True, null=True)
     content = HTMLField("Контент", blank=True, null=True)
 
     is_active = models.BooleanField("Активен", default=True)

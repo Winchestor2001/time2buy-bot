@@ -1,7 +1,7 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem
+from .models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem, ProductImage
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -50,11 +50,44 @@ class ProductSizeSerializer(serializers.ModelSerializer):
         model = ProductSize
         fields = ("id", "label")
 
+
+class ProductImageSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductImage
+        fields = ("id", "url", "is_main", "sort_order")
+
+    def get_url(self, obj):
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+
 class ProductSerializer(serializers.ModelSerializer):
     sizes = ProductSizeSerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    main_image = serializers.SerializerMethodField()
     class Meta:
         model = Product
-        fields = ("id", "name", "description", "price", "old_price", "image", "category", "sizes")
+        fields = ("id", "name", "description", "price", "old_price", "images", "category", "main_image", "sizes")
+
+    def get_main_image(self, obj):
+        return obj.main_image_url()
+
+    def get_sizes(self, obj):
+        # сортировка размеров: S, M, L, XL, XXL, 3XL, затем числа, затем остальное
+        order = {"S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5, "3XL": 6}
+        def key(s):
+            lbl = (s.label or "").upper().strip()
+            if lbl in order:
+                return (0, order[lbl])
+            if lbl.isdigit():
+                return (1, int(lbl))
+            return (2, lbl)
+        items = sorted(obj.sizes.all(), key=key)
+        return ProductSizeSerializer(items, many=True).data
 
 class BannerSerializer(serializers.ModelSerializer):
     category_id = serializers.IntegerField(source="category.id", read_only=True)
@@ -100,7 +133,7 @@ class CheckoutResponseSerializer(serializers.Serializer):
 class InfoPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = InfoPage
-        fields = ("id", "slug", "title", "external_url", "content")
+        fields = ("id", "slug", "title", "external_url", "content", "image")
 
 
 class CartSetQuantitySerializer(serializers.Serializer):
