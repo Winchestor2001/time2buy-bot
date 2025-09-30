@@ -68,13 +68,9 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     sizes = ProductSizeSerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
-    main_image = serializers.SerializerMethodField()
     class Meta:
         model = Product
-        fields = ("id", "name", "description", "price", "old_price", "images", "category", "main_image", "sizes")
-
-    def get_main_image(self, obj):
-        return obj.main_image_url()
+        fields = ("id", "name", "description", "price", "old_price", "images", "category", "sizes")
 
     def get_sizes(self, obj):
         # сортировка размеров: S, M, L, XL, XXL, 3XL, затем числа, затем остальное
