@@ -20,8 +20,11 @@ from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
+from core.admin_dashboard import analytics_dashboard
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path("admin/", analytics_dashboard, name="admin-analytics"),
+    path("admin/core/", admin.site.urls),
     path("tinymce/", include("tinymce.urls")),
     path('api/', include('shop.urls')),
 

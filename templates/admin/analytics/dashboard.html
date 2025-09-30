@@ -1,0 +1,86 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Аналитика" %}{% endblock %}
+
+{# основной контент #}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+  <!-- Заголовок -->
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">{% trans "Аналитика" %}</h1>
+    <div class="text-sm text-base-500">
+      {{ data.now_fmt }} • {% trans "обновлено сейчас" %}
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <!-- Выручка сегодня -->
+    <div class="rounded-2xl border border-base-200 bg-card/80 p-5 shadow-sm">
+      <div class="text-base-500 text-sm">{% trans "Выручка сегодня" %}</div>
+      <div class="mt-2 text-3xl font-semibold tracking-tight">
+        {{ data.kpi.revenue_today|floatformat:2 }}
+      </div>
+    </div>
+
+    <!-- Выручка за 7 дней -->
+    <div class="rounded-2xl border border-base-200 bg-card/80 p-5 shadow-sm">
+      <div class="text-base-500 text-sm">{% trans "Выручка за 7 дней" %}</div>
+      <div class="mt-2 text-3xl font-semibold tracking-tight">
+        {{ data.kpi.revenue_7|floatformat:2 }}
+      </div>
+    </div>
+
+    <!-- Заказы всего -->
+    <div class="rounded-2xl border border-base-200 bg-card/80 p-5 shadow-sm">
+      <div class="text-base-500 text-sm">{% trans "Заказы всего" %}</div>
+      <div class="mt-2 text-3xl font-semibold tracking-tight">
+        {{ data.kpi.orders_total|default:0 }}
+      </div>
+    </div>
+
+    <!-- Средний чек -->
+    <div class="rounded-2xl border border-base-200 bg-card/80 p-5 shadow-sm">
+      <div class="text-base-500 text-sm">{% trans "Средний чек (AOV)" %}</div>
+      <div class="mt-2 text-3xl font-semibold tracking-tight">
+        {{ data.kpi.aov|floatformat:2 }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Мини-барчарт «Продажи за 14 дней» -->
+  <div class="rounded-2xl border border-base-200 bg-card/80 p-5 shadow-sm">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold">{% trans "Продажи за 14 дней" %}</h3>
+      <div class="text-sm text-base-500">
+        {% trans "Всего" %}: {{ data.kpi.revenue_30|floatformat:2 }}
+      </div>
+    </div>
+
+    <div class="mt-5">
+      {% if data.chart.labels %}
+        <div class="rounded-xl border border-base-200 bg-base-100/40 p-3">
+          <!-- фиксированная высота + выравнивание по нижнему краю -->
+          <div style="height:160px;display:flex;align-items:flex-end;gap:8px;">
+            {% for v in data.chart.values %}
+              <div class="rounded bg-primary/80 dark:bg-primary/70"
+                   style="height: {{ v|add:'8'|floatformat:0 }}px; width: calc(100% / {{ data.chart.values|length }});"
+                   title="{{ v|floatformat:2 }}">
+              </div>
+            {% endfor %}
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-base-500">
+            <span>{{ data.chart.labels|first }}</span>
+            <span>{{ data.chart.labels|last }}</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="text-base-500">{% trans "Нет данных" %}</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
