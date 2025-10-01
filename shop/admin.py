@@ -154,7 +154,7 @@ class CartItemAdmin(ModelAdmin):
 
 @admin.register(InfoPage)
 class InfoPageAdmin(ModelAdmin):
-    list_display = ("id", "slug", "title", "content", "is_active", "sort_order", "updated_at")
+    list_display = ("id", "slug", "title", "is_active", "sort_order", "updated_at")
     list_display_links = ("slug", "title")
     list_editable = ("is_active", "sort_order")
     list_filter = ("is_active", "slug")
