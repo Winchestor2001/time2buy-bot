@@ -22,7 +22,7 @@ UNFOLD = {
     },
     "SIDEBAR": {
         "show_search": True,
-        "show_all_applications": True,
+        "show_all_applications": False,
 
         "navigation": [
             {
