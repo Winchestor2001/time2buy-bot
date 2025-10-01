@@ -55,7 +55,7 @@ async def start(message: Message):
     # 4) добро пожаловать
     await message.answer(
         f"👋 Привет, {message.from_user.first_name}!\n\n"
-        "Добро пожаловать в магазин *Time2Buy* 🎉\n\n"
+        "Добро пожаловать в магазин <b>Time2Buy</b> 🎉\n\n"
         "🛒 Здесь ты можешь просматривать каталог, добавлять товары в корзину и оформлять заказ.\n\n"
         "👇 Нажми кнопку ниже, чтобы открыть магазин:",
     )
