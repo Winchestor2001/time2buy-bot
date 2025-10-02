@@ -88,3 +88,19 @@ def notify_admins(text: str) -> None:
     else:
         # обычный sync-контекст (DRF view) — создаём новый loop
         asyncio.run(_notify_admins_async(text, chat_ids))
+
+
+def abs_url(request, file_field) -> str | None:
+    """
+    Возвращает абсолютный URL для File/ImageField
+    (или None, если файла нет). Безопасно для «битых» storage.
+    """
+    if not file_field:
+        return None
+    try:
+        url = file_field.url
+    except Exception:
+        return None
+    if request:
+        return request.build_absolute_uri(url)
+    return url

@@ -1,6 +1,8 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
+from core.utils import abs_url
 from .models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem, ProductImage
 
 
@@ -12,18 +14,15 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ("id", "name", "image", "parent", "subcategories")
 
-    @extend_schema_field(serializers.ListField(child=serializers.DictField()))  # или ссылку на этот же сериализатор
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_subcategories(self, obj):
-        # верни сериализатор подкатегорий (если делаешь дерево)
         qs = obj.subcategories.all()
         return CategorySerializer(qs, many=True, context=self.context).data
 
-    @extend_schema_field(OpenApiTypes.URI)  # подсказка схеме, что это URL/None
+    @extend_schema_field(OpenApiTypes.URI)
     def get_image(self, obj) -> str | None:
         request = self.context.get("request")
-        if obj.image and request:
-            return request.build_absolute_uri(obj.image.url)
-        return None
+        return abs_url(request, obj.image)
 
 
 class CategoryFlatSerializer(serializers.ModelSerializer):
@@ -33,17 +32,10 @@ class CategoryFlatSerializer(serializers.ModelSerializer):
         model = Category
         fields = ("id", "name", "image", "parent_id")
 
-    @extend_schema_field(OpenApiTypes.URI)  # подсказываем, что это URL (может быть null)
+    @extend_schema_field(OpenApiTypes.URI)
     def get_image(self, obj) -> str | None:
         request = self.context.get("request")
-        if not obj.image:
-            return None
-        try:
-            url = obj.image.url
-        except ValueError:
-            # файл отсутствует/битый storage — безопасно вернём None
-            return None
-        return request.build_absolute_uri(url) if request else url
+        return abs_url(request, obj.image)
 
 class ProductSizeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -59,22 +51,26 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ("id", "url", "is_main", "sort_order")
 
     def get_url(self, obj):
+        request = self.context.get("request")
         try:
-            return obj.image.url
+            url = obj.image.url
         except Exception:
             return None
+        return request.build_absolute_uri(url) if request else url
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    sizes = ProductSizeSerializer(many=True, read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True)
+    sizes = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = ("id", "name", "description", "price", "old_price", "images", "category", "sizes")
 
     def get_sizes(self, obj):
-        # сортировка размеров: S, M, L, XL, XXL, 3XL, затем числа, затем остальное
+        # сортировка размеров: S, M, L, XL, XXL, 3XL → затем числа → затем остальное
         order = {"S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5, "3XL": 6}
+
         def key(s):
             lbl = (s.label or "").upper().strip()
             if lbl in order:
@@ -82,18 +78,47 @@ class ProductSerializer(serializers.ModelSerializer):
             if lbl.isdigit():
                 return (1, int(lbl))
             return (2, lbl)
+
         items = sorted(obj.sizes.all(), key=key)
         return ProductSizeSerializer(items, many=True).data
 
+    def get_images(self, obj):
+        """
+        Возвращаем список изображений с абсолютными URL.
+        """
+        request = self.context.get("request")
+        qs = obj.images.all().order_by("sort_order", "id")
+        data = []
+        for im in qs:
+            data.append({
+                "id": im.id,
+                "url": abs_url(request, im.image),
+                "is_main": im.is_main,
+                "sort_order": im.sort_order,
+            })
+        return data
+
+
 class BannerSerializer(serializers.ModelSerializer):
     category_id = serializers.IntegerField(source="category.id", read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Banner
         fields = ("id", "title", "image", "category_id", "url")
 
+    def get_image(self, obj):
+        request = self.context.get("request")
+        try:
+            url = obj.image.url
+        except Exception:
+            return None
+        return request.build_absolute_uri(url) if request else url
+
+
 class CartItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
+
     class Meta:
         model = CartItem
         fields = ("id", "user_id", "product", "quantity")
@@ -104,11 +129,36 @@ class CheckoutRequestSerializer(serializers.Serializer):
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
-    image = serializers.ImageField(source="product.image", read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
         fields = ("id", "product", "product_name", "image", "quantity", "price")
+
+    @extend_schema_field(OpenApiTypes.URI)
+    def get_image(self, obj) -> str | None:
+        """
+        Если у продукта мульти-изображения — берём главное/первое.
+        Иначе — пробуем старое поле product.image (если ещё есть).
+        """
+        request = self.context.get("request")
+
+        # 1) сначала main
+        main = obj.product.images.filter(is_main=True).order_by("sort_order", "id").first()
+        if main:
+            return abs_url(request, main.image)
+
+        # 2) потом просто первое
+        any_img = obj.product.images.order_by("sort_order", "id").first()
+        if any_img:
+            return abs_url(request, any_img.image)
+
+        # 3) fallback на product.image (если ещё используешь)
+        if hasattr(obj.product, "image"):
+            return abs_url(request, obj.product.image)
+
+        return None
+
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
@@ -127,9 +177,18 @@ class CheckoutResponseSerializer(serializers.Serializer):
 
 # Если используешь InfoPage:
 class InfoPageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = InfoPage
         fields = ("id", "slug", "title", "external_url", "content", "image")
+
+    @extend_schema_field(OpenApiTypes.URI)
+    def get_image(self, obj) -> str | None:
+        request = self.context.get("request")
+        # Если у InfoPage будет поле image — раскомментируй:
+        # return abs_url(request, obj.image)
+        return None  # или удаляй метод/поле если картинки нет
 
 
 class CartSetQuantitySerializer(serializers.Serializer):

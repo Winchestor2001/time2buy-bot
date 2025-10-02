@@ -31,7 +31,7 @@ ALLOWED_HOSTS = ["time2buy.api.dizel.online", "localhost", "127.0.0.1"]
 # ]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-SUBSCRIPTION_CACHE_TTL = 300
+SUBSCRIPTION_CACHE_TTL = 5
 # Application definition
 
 INSTALLED_APPS = [

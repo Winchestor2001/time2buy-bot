@@ -56,28 +56,50 @@ class CategoryFlatView(generics.ListAPIView):
 class ProductListView(generics.ListAPIView):
     """
     GET /api/products/?category_id=...&sort=new|cheap|expensive
+    - category_id: может быть id родителя — вернём товары из него и всех подкатегорий
+    - sort: new|cheap|expensive
     """
     serializer_class = ProductSerializer
     permission_classes = [permissions.AllowAny]
-    filter_backends = [filters.SearchFilter]   # оставляем только поиск
+    filter_backends = [filters.SearchFilter]
     search_fields = ["name", "description"]
     pagination_class = DefaultPagination
+
+    def _descendant_ids(self, root_id: int) -> list[int]:
+        """Собираем id всех потомков (включая сам root) простым BFS."""
+        ids = []
+        layer = [root_id]
+        while layer:
+            ids.extend(layer)
+            layer = list(
+                Category.objects
+                .filter(parent_id__in=layer)
+                .values_list("id", flat=True)
+            )
+        return ids
 
     def get_queryset(self) -> QuerySet:
         qs = Product.objects.all().prefetch_related("sizes")
 
-        # --- фильтр по категории ---
+        # --- фильтр по категории (включая потомков) ---
         category_id = self.request.query_params.get("category_id")
         if category_id:
-            qs = qs.filter(category_id=category_id)
+            try:
+                root_id = int(category_id)
+            except (TypeError, ValueError):
+                root_id = None
+
+            if root_id:
+                cat_ids = self._descendant_ids(root_id)
+                qs = qs.filter(category_id__in=cat_ids)
 
         # --- сортировка ---
         sort = self.request.query_params.get("sort")
         if sort == "cheap":
-            qs = qs.order_by("price")
+            qs = qs.order_by("price", "-id")
         elif sort == "expensive":
-            qs = qs.order_by("-price")
-        else:  # new (по умолчанию)
+            qs = qs.order_by("-price", "-id")
+        else:  # new по умолчанию
             qs = qs.order_by("-id")
 
         return qs
@@ -259,7 +281,8 @@ class CheckoutView(generics.CreateAPIView):
             )
         )
 
-        return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+        return Response(OrderSerializer(order, context={"request": request}).data,
+                        status=status.HTTP_200_OK)
 
 # --- InfoPage на generics (если используешь) ---
 
