@@ -31,7 +31,7 @@ ALLOWED_HOSTS = ["time2buy.api.dizel.online", "localhost", "127.0.0.1"]
 # ]
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-
+SUBSCRIPTION_CACHE_TTL = 300
 # Application definition
 
 INSTALLED_APPS = [
@@ -150,6 +150,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PERMISSION_CLASSES": [
+        "core.permissions.IsSubscribed",  # наша проверка
+        "rest_framework.permissions.AllowAny",  # API открыто, но с вашей проверкой
+    ],
 }
 
 SPECTACULAR_SETTINGS = {

@@ -27,6 +27,7 @@ urlpatterns = [
     path("admin/core/", admin.site.urls),
     path("tinymce/", include("tinymce.urls")),
     path('api/', include('shop.urls')),
+    path('api/user/', include('users.urls')),
 
     # OpenAPI схема
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
