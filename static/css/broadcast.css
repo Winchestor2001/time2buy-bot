@@ -14,20 +14,20 @@ html.dark .broadcast-card{
 .broadcast-card .card-body{padding:22px}
 .broadcast-title{font-size:20px;font-weight:700;margin:0 0 16px}
 
-/* --- ПОЛЯ: адресуемся по #broadcast-form, чтобы перебить Unfold --- */
+/* --- поля формы (перебиваем Unfold) --- */
 #broadcast-form textarea,
 #broadcast-form input[type="text"],
 #broadcast-form input[type="file"],
 #broadcast-form select{
   width:100%;
-  background:#f9fafb !important;           /* светлая тема фон поля */
+  background:#f9fafb !important;
   color:#111827 !important;
   border:1px solid rgba(17,24,39,.18) !important;
   border-radius:10px !important;
   padding:10px 12px;
   font-size:14px;
   outline:none !important;
-  box-shadow:none !important;               /* снимаем белый inset у Unfold */
+  box-shadow:none !important;
 }
 html[data-theme="dark"] #broadcast-form textarea,
 html[data-theme="dark"] #broadcast-form input[type="text"],
@@ -68,26 +68,20 @@ html[data-theme="dark"] .field-help, html.dark .field-help{color:#9ca3af}
 .btn-primary:hover{background:var(--primary-hov)}
 .btn-primary:active{background:var(--primary-press)}
 
-
-/* СТИЛЬ SELECT (с кастомной стрелкой) */
-#broadcast-form select {
+/* ====== СЕЛЕКТЫ ====== */
+/* Обычный селект — со стрелкой */
+#broadcast-form select:not([multiple]) {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
 
-  width: 100%;
   height: 42px;
-  padding: 0 40px 0 12px;   /* отступ справа под иконку */
-  font-size: 14px;
-  border-radius: 10px;
-  border: 1px solid var(--field-border);
-  background-color: var(--field-bg);
-  color: var(--field-text);
+  padding: 0 40px 0 12px;   /* место под стрелку */
   line-height: 40px;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease;
 
-  /* кастомная стрелка (light theme) */
+  /* стрелка (light) */
   background-image: url("data:image/svg+xml;utf8,\
   <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'>\
   <path d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%23111827' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>\
@@ -97,21 +91,27 @@ html[data-theme="dark"] .field-help, html.dark .field-help{color:#9ca3af}
   background-size: 16px;
 }
 
-#broadcast-form select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
-}
-
-/* DARK THEME стрелка */
-html[data-theme="dark"] #broadcast-form select,
-html.dark #broadcast-form select {
+/* стрелка (dark) */
+html[data-theme="dark"] #broadcast-form select:not([multiple]),
+html.dark #broadcast-form select:not([multiple]) {
   background-image: url("data:image/svg+xml;utf8,\
   <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none'>\
   <path d='M5.5 7.5l4.5 4.5 4.5-4.5' stroke='%23e5e7eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>\
   </svg>");
 }
 
+/* Мультиселект (каналы) — без стрелки, с нормальной высотой */
+#broadcast-form select[multiple]{
+  min-height: 220px;
+  padding: 8px 12px;
+  line-height: 1.3;
+  background-image: none !important;
+}
+#broadcast-form select[multiple] option{
+  padding: 6px 8px;
+}
 
+/* ====== тулбар над списком (кнопка "Отправить рассылку всем") ====== */
 .broadcast-toolbar{
   display:flex;
   align-items:center;
@@ -119,44 +119,18 @@ html.dark #broadcast-form select {
   gap:12px;
   margin-bottom:12px;
 }
-
-/* Левая часть (поиск) растягивается, но не на всю ширину */
-.broadcast-toolbar .bt-left{
-  flex:1 1 auto;
-  min-width:260px;
-}
-
-/* Сам контейнер поиска в Django/Unfold часто 100% ширины — ограничим */
+.broadcast-toolbar .bt-left{ flex:1 1 auto; min-width:260px; }
 .broadcast-toolbar .bt-left form,
-.broadcast-toolbar .bt-left #changelist-search {
-  display:block;
-  max-width:520px;      /* можно увеличить/уменьшить под вкус */
-  width:100%;
-}
-
-/* Правая часть (наша кнопка) — не переносится */
-.broadcast-toolbar .bt-right{
-  flex:0 0 auto;
-  white-space:nowrap;
-}
-
-/* Кнопка в стиле Unfold/нашего бренда */
+.broadcast-toolbar .bt-left #changelist-search { display:block; max-width:520px; width:100%; }
+.broadcast-toolbar .bt-right{ flex:0 0 auto; white-space:nowrap; }
 .broadcast-toolbar .bt-right .btn,
 .broadcast-toolbar .bt-right .btn-primary{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding:9px 14px;
-  border-radius:10px;
-  border:1px solid #1d4acc;
-  background:#1d4acc;
-  color:#fff;
-  font-weight:600;
+  display:inline-flex; align-items:center; gap:8px; padding:9px 14px;
+  border-radius:10px; border:1px solid #1d4acc; background:#1d4acc; color:#fff; font-weight:600;
 }
 .broadcast-toolbar .bt-right .btn-primary:hover{ background:#15379a; border-color:#15379a; }
 .broadcast-toolbar .bt-right .btn-primary:active{ background:#112b7a; border-color:#112b7a; }
 
-/* Адаптив: на узких экранах уводим кнопку под поиск, но с отступом */
 @media (max-width: 900px){
   .broadcast-toolbar{ flex-direction:column; align-items:stretch; }
   .broadcast-toolbar .bt-right{ align-self:flex-start; }

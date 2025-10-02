@@ -7,7 +7,7 @@ from django import forms
 from django.conf import settings
 
 from bot.config import BOT_TOKEN
-from users.models import TelegramAdmin
+from users.models import TelegramAdmin, SubscriptionChannel
 
 BUTTONS_HELP = (
     "Инлайн-кнопки в формате: каждая кнопка с новой строки, «Текст | URL». Пример:\n"
@@ -96,4 +96,44 @@ class TelegramAdminForm(forms.ModelForm):
 
         cleaned["telegram_id"] = resolved_id
         cleaned["username"] = username
+        return cleaned
+
+
+class ChannelBroadcastForm(forms.Form):
+    MEDIA_CHOICES = [
+        ("text", "Только текст"),
+        ("photo", "Фото"),
+        ("video", "Видео"),
+        ("animation", "GIF/Анимация"),
+    ]
+
+    media_type = forms.ChoiceField(label="Тип сообщения", choices=MEDIA_CHOICES, initial="text")
+    text = forms.CharField(label="Текст", required=False, widget=forms.Textarea(attrs={"rows": 5}))
+    file = forms.FileField(label="Медиа-файл", required=False, help_text="Фото/видео/гиф в зависимости от типа")
+    buttons = forms.CharField(label="Кнопки", required=False, widget=forms.Textarea(attrs={"rows": 3}), help_text=BUTTONS_HELP)
+
+    # ВЫБОР КАНАЛОВ
+    channels = forms.ModelMultipleChoiceField(
+        label="Каналы/группы для публикации",
+        queryset=SubscriptionChannel.objects.none(),   # зададим в __init__
+        required=False,
+        help_text="Если ничего не выбрать — отправим во все активные каналы.",
+        widget=forms.SelectMultiple(attrs={"size": 10}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        # Можно ограничить только активными
+        qs = kwargs.pop("channels_qs", None)
+        super().__init__(*args, **kwargs)
+        self.fields["channels"].queryset = qs if qs is not None else SubscriptionChannel.objects.filter(is_active=True).order_by("sort_order", "title")
+
+    def clean(self):
+        cleaned = super().clean()
+        mtype = cleaned.get("media_type")
+        text = cleaned.get("text")
+        file = cleaned.get("file")
+        if mtype == "text" and not text:
+            self.add_error("text", "Нужен текст для текстового сообщения.")
+        if mtype != "text" and not file:
+            self.add_error("file", "Для этого типа нужен загруженный файл.")
         return cleaned

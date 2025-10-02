@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  <link rel="stylesheet" href="{% static 'css/broadcast.css' %}">
+{% endblock %}
+
+{% block content %}
+  <div class="broadcast-card">
+    <div class="card-body">
+      <h1 class="broadcast-title">📣 Публикация в каналы</h1>
+
+      <form id="broadcast-form" method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <!-- Тип -->
+        <div class="form-row">
+          <label class="field-label" for="{{ form.media_type.id_for_label }}">{{ form.media_type.label }}</label>
+          {{ form.media_type }}
+        </div>
+
+        <!-- Текст -->
+        <div class="form-row" id="text-field">
+          <label class="field-label" for="{{ form.text.id_for_label }}">{{ form.text.label }}</label>
+          {{ form.text }}
+        </div>
+
+        <!-- Файл (по умолчанию скрыт) -->
+        <div class="form-row" id="file-field" style="display:none;">
+          <label class="field-label" for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+          {{ form.file }}
+        </div>
+
+        <!-- Кнопки -->
+        <div class="form-row">
+          <label class="field-label" for="{{ form.buttons.id_for_label }}">{{ form.buttons.label }}</label>
+          {{ form.buttons }}
+          {% if form.buttons.help_text %}
+            <p class="field-help">{{ form.buttons.help_text|linebreaksbr }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Каналы -->
+        <div class="form-row">
+          <label class="field-label" for="{{ form.channels.id_for_label }}">{{ form.channels.label }}</label>
+          {{ form.channels }}
+          {% if form.channels.help_text %}
+            <p class="field-help">{{ form.channels.help_text }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Действия -->
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">{% trans "Отправить" %}</button>
+          <a href="{% url 'admin:users_subscriptionchannel_changelist' %}" class="btn">{% trans "Отмена" %}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const mediaTypeSelect = document.getElementById("id_media_type");
+      const textField = document.getElementById("text-field");
+      const fileField = document.getElementById("file-field");
+
+      function toggleFields() {
+        const value = mediaTypeSelect.value;
+        if (value === "text") {
+          textField.style.display = "block";
+          fileField.style.display = "none";
+        } else if (value === "image" || value === "video" || value === "animation") {
+          textField.style.display = "none";
+          fileField.style.display = "block";
+        } else {
+          textField.style.display = "block";
+          fileField.style.display = "none";
+        }
+      }
+
+      mediaTypeSelect.addEventListener("change", toggleFields);
+      toggleFields(); // вызвать при загрузке
+    });
+  </script>
+{% endblock %}

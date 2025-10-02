@@ -6,7 +6,8 @@ from django.urls import path
 from unfold.admin import ModelAdmin
 
 from .broadcast import send_broadcast_sync
-from .forms import BroadcastForm, TelegramAdminForm
+from .channel_broadcast import send_channel_broadcast_sync
+from .forms import BroadcastForm, TelegramAdminForm, ChannelBroadcastForm
 from .models import TelegramUser, SubscriptionChannel, TelegramAdmin
 
 # Спрятать системную модель групп
@@ -104,6 +105,83 @@ class SubscriptionChannelAdmin(ModelAdmin):
     search_fields = ("title","username","chat_id")
     list_filter = ("is_group","is_required","is_active")
     ordering = ("sort_order","title")
+
+    # URL для формы рассылки
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path("broadcast/", self.admin_site.admin_view(self.broadcast_view), name="users_subscriptionchannel_broadcast"),
+        ]
+        return custom + urls
+
+    # Кнопка в тулбаре списка
+    def changelist_view(self, request, extra_context=None):
+        extra = extra_context or {}
+        extra["object_tools"] = [{
+            "label": "📣 Пост в каналы",
+            "url": "broadcast/",
+            "class": "btn btn-primary",
+            "target": "_self",
+            "permissions": ["change"],
+        }]
+        return super().changelist_view(request, extra_context=extra)
+
+    # View формы рассылки
+    def broadcast_view(self, request):
+        active_qs = SubscriptionChannel.objects.filter(is_active=True).order_by("sort_order", "title")
+
+        if request.method == "POST":
+            form = ChannelBroadcastForm(request.POST, request.FILES, channels_qs=active_qs)
+            if form.is_valid():
+                media_type = form.cleaned_data["media_type"]
+                text = form.cleaned_data.get("text")
+                file = form.cleaned_data.get("file")
+                buttons = form.cleaned_data.get("buttons")
+                selected_qs = form.cleaned_data.get("channels")  # queryset выбранных каналов
+
+                # если ничего не выбрали — берём все активные
+                if selected_qs and selected_qs.exists():
+                    chat_ids = list(selected_qs.values_list("chat_id", flat=True))
+                else:
+                    chat_ids = list(active_qs.values_list("chat_id", flat=True))
+
+                file_path = None
+                save_path = None
+                if file:
+                    save_path = default_storage.save(f"broadcast/{file.name}", file)
+                    file_path = default_storage.path(save_path)
+
+                from .channel_broadcast import send_channel_broadcast_sync
+                result = send_channel_broadcast_sync(
+                    media_type=media_type,
+                    text=text,
+                    file_path=file_path,
+                    buttons_raw=buttons,
+                    chat_ids=chat_ids,
+                )
+
+                # удалим загруженный файл после отправки
+                if save_path:
+                    try:
+                        default_storage.delete(save_path)
+                    except Exception:
+                        pass
+
+                messages.success(
+                    request,
+                    f"Готово! Отправлено: {result.ok}/{result.total}, не доставлено: {result.failed}."
+                )
+                return redirect("admin:users_subscriptionchannel_changelist")
+        else:
+            form = ChannelBroadcastForm(channels_qs=active_qs)
+
+        context = self.admin_site.each_context(request)
+        context.update({
+            "title": "📣 Публикация в каналы",
+            "opts": self.model._meta,
+            "form": form,
+        })
+        return render(request, "admin/channel_broadcast_form.html", context)
 
 
 @admin.action(description="Определить telegram_id по username для выбранных")
