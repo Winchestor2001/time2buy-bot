@@ -187,8 +187,8 @@ class InfoPageSerializer(serializers.ModelSerializer):
     def get_image(self, obj) -> str | None:
         request = self.context.get("request")
         # Если у InfoPage будет поле image — раскомментируй:
-        # return abs_url(request, obj.image)
-        return None  # или удаляй метод/поле если картинки нет
+        return abs_url(request, obj.image)
+        # return None  # или удаляй метод/поле если картинки нет
 
 
 class CartSetQuantitySerializer(serializers.Serializer):
