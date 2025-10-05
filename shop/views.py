@@ -3,22 +3,23 @@ from decimal import Decimal
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, filters, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from django.db.models import Prefetch, QuerySet
+from django.db.models import Prefetch, QuerySet, Count, Q
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
 from bot.config import BOT_TOKEN
-from core.utils import notify_admins
+from core.utils import notify_admins, _size_sort_key
 from users.models import TelegramUser
-from .models import Category, Product, Banner, CartItem, InfoPage, OrderItem, Order
+from .models import Category, Product, Banner, CartItem, InfoPage, OrderItem, Order, ProductSize
 from .pagination import DefaultPagination
 from .serializers import (
     CategorySerializer, CategoryFlatSerializer,
     ProductSerializer, BannerSerializer, CartItemSerializer,
     InfoPageSerializer, CheckoutResponseSerializer, CheckoutRequestSerializer, CartChangeQuantitySerializer,
     CartDeleteItemSerializer, CartClearSerializer, TelegramWebAppAuthRequestSerializer,
-    TelegramWebAppAuthResponseSerializer, OrderSerializer,
+    TelegramWebAppAuthResponseSerializer, OrderSerializer, SizeLabelSerializer, SizeWithCountSerializer,
 )
 from .telegram_auth import verify_telegram_init_data
 
@@ -55,9 +56,10 @@ class CategoryFlatView(generics.ListAPIView):
 
 class ProductListView(generics.ListAPIView):
     """
-    GET /api/products/?category_id=...&sort=new|cheap|expensive
+    GET /api/products/?category_id=...&sort=new|cheap|expensive&size=...&sizes=...
     - category_id: может быть id родителя — вернём товары из него и всех подкатегорий
     - sort: new|cheap|expensive
+    - size / sizes: фильтр по размерам (S,M,L,XL,XXL,3XL, числа и т.д.)
     """
     serializer_class = ProductSerializer
     permission_classes = [permissions.AllowAny]
@@ -78,6 +80,32 @@ class ProductListView(generics.ListAPIView):
             )
         return ids
 
+    def _parse_sizes(self) -> list[str]:
+        """
+        Собираем список размеров из query params:
+        - size=S (может повторяться)
+        - sizes=S,M,XL
+        Возвращаем нормализованные лейблы без лишних пробелов (регистр не важен).
+        """
+        qp = self.request.query_params
+        values = []
+
+        # повторяющиеся size=...
+        values.extend(qp.getlist("size") or [])
+
+        # одно поле sizes=...
+        sizes_csv = qp.get("sizes")
+        if sizes_csv:
+            values.extend(sizes_csv.split(","))
+
+        # нормализация
+        cleaned = []
+        for v in values:
+            s = (v or "").strip()
+            if s:
+                cleaned.append(s)
+        return cleaned
+
     def get_queryset(self) -> QuerySet:
         qs = Product.objects.all().prefetch_related("sizes")
 
@@ -92,6 +120,16 @@ class ProductListView(generics.ListAPIView):
             if root_id:
                 cat_ids = self._descendant_ids(root_id)
                 qs = qs.filter(category_id__in=cat_ids)
+
+        # --- фильтр по размерам (логика OR) ---
+        size_labels = self._parse_sizes()
+        if size_labels:
+            # построим Q c icontains для каждого лейбла
+            q = Q()
+            for lbl in size_labels:
+                q |= Q(sizes__label__iexact=lbl) | Q(sizes__label__icontains=lbl)
+                # iexact закроет точные совпадения ("XL"), icontains поможет для "40+" по "40"
+            qs = qs.filter(q).distinct()
 
         # --- сортировка ---
         sort = self.request.query_params.get("sort")
@@ -366,3 +404,48 @@ class TelegramWebAppAuthView(APIView):
             },
         }
         return Response(resp, status=status.HTTP_200_OK)
+
+
+class SizeListView(APIView):
+    """
+    GET /api/sizes/                -> [{label: "S"}, ...]
+    GET /api/sizes/?with_counts=1  -> [{label: "S", count: 12}, ...]
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Список всех уникальных размеров",
+        responses={200: SizeLabelSerializer(many=True)},
+    )
+    def get(self, request):
+        with_counts = request.query_params.get("with_counts")
+
+        if with_counts:
+            rows = (
+                ProductSize.objects
+                .exclude(label__isnull=True)
+                .exclude(label__exact="")
+                .values("label")
+                .annotate(count=Count("id"))
+            )
+            # сортируем по нашему ключу
+            data = sorted(
+                [{"label": r["label"], "count": r["count"]} for r in rows],
+                key=lambda r: _size_sort_key(r["label"])
+            )
+            ser = SizeWithCountSerializer(data=data, many=True)
+            ser.is_valid(raise_exception=True)
+            return Response(ser.data)
+
+        # без счётчиков — просто уникальные лейблы
+        labels = (
+            ProductSize.objects
+            .exclude(label__isnull=True)
+            .exclude(label__exact="")
+            .values_list("label", flat=True)
+            .distinct()
+        )
+        labels = sorted(labels, key=_size_sort_key)
+        ser = SizeLabelSerializer(data=[{"label": x} for x in labels], many=True)
+        ser.is_valid(raise_exception=True)
+        return Response(ser.data)

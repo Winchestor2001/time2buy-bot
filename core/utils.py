@@ -104,3 +104,20 @@ def abs_url(request, file_field) -> str | None:
     if request:
         return request.build_absolute_uri(url)
     return url
+
+
+def _size_sort_key(lbl: str):
+    """
+    Правила сортировки: S, M, L, XL, XXL, 3XL -> числа -> остальное.
+    """
+    order = {"S": 1, "M": 2, "L": 3, "XL": 4, "XXL": 5, "3XL": 6}
+    s = (lbl or "").upper().strip()
+    if s in order:
+        return (0, order[s], s)
+    if s.isdigit():
+        return (1, int(s), s)
+    # частый кейс: '40+' и т.п.
+    core = s.rstrip("+")
+    if core.isdigit():
+        return (1, int(core), s)
+    return (2, s, s)

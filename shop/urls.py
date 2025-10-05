@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CategoryTreeView, CategoryFlatView, ProductListView,
     BannerListView, CartView, CheckoutView,
-    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView, ProductDetailView,
+    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView, ProductDetailView, SizeListView,
 )
 
 urlpatterns = [
@@ -10,6 +10,7 @@ urlpatterns = [
     path("categories/flat/", CategoryFlatView.as_view(), name="categories-flat"),
     path("products/", ProductListView.as_view(), name="products-list"),
     path("products/<int:pk>/", ProductDetailView.as_view(), name="products-detail"),
+    path("sizes/", SizeListView.as_view(), name="sizes-list"),
     path("banners/", BannerListView.as_view(), name="banners-list"),
     path("cart/", CartView.as_view(), name="cart"),
     path("cart/checkout/", CheckoutView.as_view(), name="cart-checkout"),

@@ -225,3 +225,11 @@ class TelegramWebAppAuthUserSerializer(serializers.Serializer):
 class TelegramWebAppAuthResponseSerializer(serializers.Serializer):
     ok = serializers.BooleanField()
     user = TelegramWebAppAuthUserSerializer()
+
+
+class SizeLabelSerializer(serializers.Serializer):
+    label = serializers.CharField()
+
+class SizeWithCountSerializer(serializers.Serializer):
+    label = serializers.CharField()
+    count = serializers.IntegerField()
