@@ -95,7 +95,7 @@ class ProductSize(models.Model):
 
 
 class Banner(models.Model):
-    title = models.CharField("Заголовок", max_length=160)
+    title = models.CharField("Заголовок", max_length=160, blank=True, null=True)
     image = models.ImageField("Изображение", upload_to="banners/")
     category = models.ForeignKey(
         "shop.Category",
