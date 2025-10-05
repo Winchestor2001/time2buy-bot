@@ -112,7 +112,7 @@ class Banner(models.Model):
         verbose_name_plural = "Баннеры"
 
     def __str__(self):
-        return self.title
+        return self.title or "-"
 
 
 class CartItem(models.Model):
