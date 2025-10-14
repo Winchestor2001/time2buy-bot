@@ -183,12 +183,25 @@ class Order(models.Model):
         DONE = "done", "Выполнен"
         CANCELED = "canceled", "Отменён"
 
+    class Delivery(models.TextChoices):
+        CDEK = "cdek", "СДЭК"
+        POST_RU = "post_ru", "Почта России"
+        MEET = "meet", "Личная встреча"
+
     tg_user = models.ForeignKey(
         TelegramUser,
         verbose_name="TG пользователь",
         on_delete=models.PROTECT,   # заказ не должен терять привязку к покупателю
         related_name="orders",
         db_index=True,
+    )
+    full_name = models.CharField("ФИО", max_length=160)
+    phone = models.CharField("Телефон", max_length=32)
+    delivery_type = models.CharField("Тип доставки", max_length=20, choices=Delivery.choices)
+    delivery_address = models.TextField(
+        "Адрес доставки",
+        blank=True, null=True,
+        help_text="Обязателен для СДЭК и Почты России",
     )
     status = models.CharField("Статус", max_length=20, choices=Status.choices, default=Status.NEW)
     total_amount = models.DecimalField("Сумма, ₽", max_digits=12, decimal_places=2, default=0)

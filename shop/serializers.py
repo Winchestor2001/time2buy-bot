@@ -126,6 +126,26 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 class CheckoutRequestSerializer(serializers.Serializer):
     user_id = serializers.CharField(help_text="Telegram user_id из WebApp.initData")
+    full_name = serializers.CharField(max_length=160)
+    phone = serializers.CharField(max_length=32)
+    delivery_type = serializers.ChoiceField(choices=Order.Delivery.choices)
+    delivery_address = serializers.CharField(allow_blank=True, required=False)
+
+    def validate(self, attrs):
+        d_type = attrs.get("delivery_type")
+        addr = (attrs.get("delivery_address") or "").strip()
+
+        # адрес обязателен для СДЭК и Почты РФ
+        if d_type in (Order.Delivery.CDEK, Order.Delivery.POST_RU) and not addr:
+            raise serializers.ValidationError({"delivery_address": "Адрес обязателен для выбранного типа доставки."})
+
+        # лёгкая нормализация телефона (опционально)
+        phone = attrs.get("phone", "").strip()
+        if not phone:
+            raise serializers.ValidationError({"phone": "Укажите номер телефона."})
+        attrs["phone"] = phone
+
+        return attrs
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -167,7 +187,11 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ("id", "tg_user_id", "tg_username", "status", "total_amount", "created_at", "items")
+        fields = (
+            "id", "tg_user_id", "tg_username", "status",
+            "total_amount", "created_at", "items", "full_name",
+            "phone", "delivery_type", "delivery_address"
+        )
 
 
 class CheckoutResponseSerializer(serializers.Serializer):

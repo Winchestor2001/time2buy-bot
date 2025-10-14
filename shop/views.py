@@ -258,7 +258,13 @@ class CartClearView(APIView):
 class CheckoutView(generics.CreateAPIView):
     """
     POST /api/cart/checkout/
-    body: { user_id: "..." }
+    body: {
+      user_id: "...",
+      full_name: "...",
+      phone: "...",
+      delivery_type: "cdek|post_ru|meet",
+      delivery_address?: "..."   # обязателен для cdek, post_ru
+    }
     """
     serializer_class = CheckoutRequestSerializer
     permission_classes = [permissions.AllowAny]
@@ -273,19 +279,31 @@ class CheckoutView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        user_id = ser.validated_data["user_id"]
+        v = ser.validated_data
 
-        # найдём TG-пользователя (если не был сохранён — создадим «пустышку»)
+        user_id = v["user_id"]
+        full_name = v["full_name"]
+        phone = v["phone"]
+        delivery_type = v["delivery_type"]
+        delivery_address = v.get("delivery_address") or ""
+
+        # TG-пользователь
         tg_user, _ = TelegramUser.objects.get_or_create(tg_id=int(user_id))
 
-        # корзина
+        # Корзина
         items_qs = CartItem.objects.filter(user_id=user_id).select_related("product")
         items = list(items_qs)
         if not items:
             return Response({"detail": "Корзина пуста."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # заказ
-        order = Order.objects.create(tg_user=tg_user)
+        # Заказ
+        order = Order.objects.create(
+            tg_user=tg_user,
+            full_name=full_name,
+            phone=phone,
+            delivery_type=delivery_type,
+            delivery_address=delivery_address,
+        )
 
         total = Decimal("0")
         bulk = []
@@ -297,21 +315,26 @@ class CheckoutView(generics.CreateAPIView):
         order.total_amount = total
         order.save(update_fields=["total_amount"])
 
-        # чистим корзину
+        # Чистим корзину
         items_qs.delete()
 
-        # уведомление админам
+        # Уведомление админам
         try:
             admin_url = request.build_absolute_uri(reverse("admin:shop_order_change", args=[order.id]))
         except Exception:
             admin_url = f"(admin link unavailable, id={order.id})"
 
         username = tg_user.username and f"@{tg_user.username.lstrip('@')}" or "—"
+        delivery_label = dict(Order.Delivery.choices).get(delivery_type, delivery_type)
+        addr_line = f"\n🏠 адрес: {delivery_address}" if delivery_type in (Order.Delivery.CDEK, Order.Delivery.POST_RU) and delivery_address else ""
+
         notify_admins(
             "\n".join(
                 [
                     f"🆕 <b>Новый заказ #{order.id}</b>",
-                    f"👤 tg_id: <code>{tg_user.tg_id}</code> | {username}",
+                    f"👤 {full_name} • {phone}",
+                    f"🧑‍💻 tg_id: <code>{tg_user.tg_id}</code> | {username}",
+                    f"🚚 доставка: <b>{delivery_label}</b>{addr_line}",
                     f"🧾 позиций: {len(bulk)}",
                     f"💰 сумма: <b>{order.total_amount}</b>",
                     f"🔗 {admin_url}",
@@ -319,8 +342,10 @@ class CheckoutView(generics.CreateAPIView):
             )
         )
 
-        return Response(OrderSerializer(order, context={"request": request}).data,
-                        status=status.HTTP_200_OK)
+        return Response(
+            OrderSerializer(order, context={"request": request}).data,
+            status=status.HTTP_200_OK
+        )
 
 # --- InfoPage на generics (если используешь) ---
 
