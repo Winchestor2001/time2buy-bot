@@ -194,6 +194,28 @@ class InfoPage(models.Model):
         return f"{self.get_slug_display()} — {self.title}"
 
 
+class AdminPaymentProfile(models.Model):
+    """
+    Реквизиты, которые админ показывает клиентам.
+    Можно завести несколько профилей и переключать активный.
+    """
+    title = models.CharField("Название профиля", max_length=80, blank=True, null=True)
+    bank_name = models.CharField("Банк", max_length=120)
+    card_number = models.CharField("Номер карты/счёта", max_length=64)
+    card_holder = models.CharField("Держатель карты", max_length=120)
+    is_active = models.BooleanField("Активен", default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Платёжный профиль"
+        verbose_name_plural = "Платёжные профили"
+        ordering = ("-is_active", "sort_order", "id")
+
+    def __str__(self):
+        t = f" ({self.title})" if self.title else ""
+        return f"{self.bank_name}{t}"
+
+
 class Order(models.Model):
     class Status(models.TextChoices):
         NEW = "new", "Новый"
@@ -225,6 +247,17 @@ class Order(models.Model):
     total_amount = models.DecimalField("Сумма, ₽", max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField("Создан", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлён", auto_now=True)
+
+    pay_bank = models.CharField("Банк", max_length=120, blank=True, null=True)
+    pay_card = models.CharField("Номер карты/счёта", max_length=64, blank=True, null=True)
+    pay_holder = models.CharField("Держатель карты", max_length=120, blank=True, null=True)
+    pay_profile = models.ForeignKey(  # на всякий случай сохраним связь с профилем
+        AdminPaymentProfile,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Платёжный профиль (источник)",
+        related_name="orders",
+    )
 
     class Meta:
         ordering = ("-id",)

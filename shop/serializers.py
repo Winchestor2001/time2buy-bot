@@ -170,6 +170,17 @@ class CheckoutRequestSerializer(serializers.Serializer):
 
         return attrs
 
+
+class MyActiveOrderRequestSerializer(serializers.Serializer):
+    user_id = serializers.CharField()
+
+
+class OrderPaymentSerializer(serializers.Serializer):
+    bank = serializers.CharField()
+    card = serializers.CharField()
+    holder = serializers.CharField()
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     image = serializers.SerializerMethodField()
@@ -207,14 +218,22 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     tg_user_id = serializers.IntegerField(source="tg_user.tg_id", read_only=True)
     tg_username = serializers.CharField(source="tg_user.username", read_only=True)
+    payment = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = (
             "id", "tg_user_id", "tg_username", "status",
             "total_amount", "created_at", "items", "full_name",
-            "phone", "delivery_type", "delivery_address"
+            "phone", "delivery_type", "delivery_address", "payment"
         )
+
+    def get_payment(self, obj):
+        return {
+            "bank": obj.pay_bank or "",
+            "card": obj.pay_card or "",
+            "holder": obj.pay_holder or "",
+        }
 
 
 class CheckoutResponseSerializer(serializers.Serializer):

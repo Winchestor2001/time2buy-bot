@@ -4,7 +4,8 @@ from tinymce.models import HTMLField
 from tinymce.widgets import TinyMCE
 from unfold.admin import ModelAdmin, TabularInline  # классы из django-unfold
 
-from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem, ProductImage
+from shop.models import Category, Product, ProductSize, Banner, CartItem, InfoPage, Order, OrderItem, ProductImage, \
+    AdminPaymentProfile
 from import_export.admin import ImportExportModelAdmin
 from unfold.contrib.import_export.forms import ExportForm, ImportForm
 
@@ -210,9 +211,23 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(ModelAdmin):
-    list_display = ("id", "tg_user", "status", "total_amount", "created_at")
+    list_display = ("id", "tg_user", "status", "pay_bank", "total_amount", "created_at")
     list_filter = ("status",)
     search_fields = ("tg_user__tg_id", "id")
     ordering = ("-id",)
     inlines = (OrderItemInline,)
-    readonly_fields = ("created_at", "updated_at", "total_amount")
+    readonly_fields = ("created_at", "updated_at", "total_amount", "pay_bank", "pay_card", "pay_holder")
+
+
+@admin.register(AdminPaymentProfile)
+class AdminPaymentProfileAdmin(ModelAdmin):
+    list_display = ("id", "title", "bank_name", "card_masked", "card_holder", "is_active", "sort_order")
+    list_editable = ("is_active", "sort_order")
+    search_fields = ("title", "bank_name", "card_number", "card_holder")
+    ordering = ("-is_active", "sort_order", "id")
+
+    def card_masked(self, obj):
+        n = obj.card_number.replace(" ", "")
+        tail = n[-4:] if len(n) >= 4 else n
+        return f"•••• {tail}"
+    card_masked.short_description = "Карта"

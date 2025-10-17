@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CategoryTreeView, CategoryFlatView, ProductListView,
     BannerListView, CartView, CheckoutView,
-    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView, ProductDetailView, SizeListView,
+    InfoPageListView, InfoPageDetailView, TelegramWebAppAuthView, ProductDetailView, SizeListView, MyActiveOrderView,
 )
 
 urlpatterns = [
@@ -19,4 +19,6 @@ urlpatterns = [
     # если используешь инфо-разделы:
     path("info/", InfoPageListView.as_view(), name="info-list"),
     path("info/<slug:slug>/", InfoPageDetailView.as_view(), name="info-detail"),
+
+    path("orders/active/", MyActiveOrderView.as_view(), name="orders-active"),
 ]
