@@ -38,6 +38,24 @@ class Product(models.Model):
         on_delete=models.SET_NULL,
     )
 
+    video_url = models.URLField(
+        "Ссылка на видео (YouTube/Вконтакте и т.п.)",
+        blank=True, null=True,
+        help_text="Можно указать внешнюю ссылку на видео."
+    )
+    video_file = models.FileField(
+        "Файл видео",
+        upload_to="products/videos/",
+        blank=True, null=True,
+        help_text="Если загружаешь файл — ссылку можно не указывать."
+    )
+    video_poster = models.ImageField(
+        "Постер видео",
+        upload_to="products/videos/",
+        blank=True, null=True,
+        help_text="Картинка-заставка (опционально)."
+    )
+
     class Meta:
         verbose_name = "Продукт"
         verbose_name_plural = "Продукты"

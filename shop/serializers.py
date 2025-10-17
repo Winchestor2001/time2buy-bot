@@ -62,10 +62,11 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     sizes = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
+    video = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
-        fields = ("id", "name", "description", "price", "old_price", "images", "category", "sizes")
+        fields = ("id", "name", "description", "price", "old_price", "images", "video", "category", "sizes")
 
     def get_sizes(self, obj):
         # сортировка размеров: S, M, L, XL, XXL, 3XL → затем числа → затем остальное
@@ -97,6 +98,28 @@ class ProductSerializer(serializers.ModelSerializer):
                 "sort_order": im.sort_order,
             })
         return data
+
+    def get_video(self, obj):
+        """
+        Возвращает единый блок:
+        {
+          "url": <внешняя ссылка или None>,
+          "file": <абсолютный URL файла или None>,
+          "poster": <абсолютный URL постера или None>,
+          "has_video": true/false
+        }
+        """
+        request = self.context.get("request")
+        url = (obj.video_url or "").strip() or None
+        file_url = abs_url(request, obj.video_file) if getattr(obj, "video_file", None) else None
+        poster_url = abs_url(request, obj.video_poster) if getattr(obj, "video_poster", None) else None
+        has_video = bool(url or file_url)
+        return {
+            "url": url,
+            "file": file_url,
+            "poster": poster_url,
+            "has_video": has_video,
+        }
 
 
 class BannerSerializer(serializers.ModelSerializer):
