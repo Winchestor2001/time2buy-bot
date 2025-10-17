@@ -257,6 +257,16 @@ class CartClearView(APIView):
 
 
 class CheckoutView(generics.CreateAPIView):
+    """
+        POST /api/cart/checkout/
+        body: {
+          user_id: "...",
+          full_name: "...",
+          phone: "...",
+          delivery_type: "cdek|post_ru|meet",
+          delivery_address?: "..."   # обязателен для cdek, post_ru
+        }
+        """
     serializer_class = CheckoutRequestSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -449,6 +459,12 @@ class SizeListView(APIView):
 
 
 class MyActiveOrderView(APIView):
+    """
+        POST /api/orders/active/
+        body: {
+          user_id: "...",
+        }
+        """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
