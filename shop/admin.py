@@ -55,7 +55,7 @@ class ProductSizeInline(TabularInline):
 @admin.register(Category)
 class CategoryAdmin(ModelAdmin):
     list_display = ("id", "name", "parent", "image_thumb")
-    list_display_links = ("name",)
+    list_display_links = list_display
     search_fields = ("name",)
     list_filter = ("parent",)
     ordering = ("name",)
@@ -90,7 +90,7 @@ class ProductAdmin(ModelAdmin, ImportExportModelAdmin):
     import_form_class = ImportForm
     export_form_class = ExportForm
     list_display = ("id", "name", "category", "price", "old_price", "image_thumb", "has_video")
-    list_display_links = ("name",)
+    list_display_links = list_display
     search_fields = ("name", "description")
     list_filter = ("category",)
     ordering = ("-id",)
@@ -213,6 +213,7 @@ class OrderItemInline(admin.TabularInline):
 class OrderAdmin(ModelAdmin):
     list_display = ("id", "tg_user", "status", "pay_bank", "total_amount", "created_at")
     list_filter = ("status",)
+    list_display_links = list_display
     search_fields = ("tg_user__tg_id", "id")
     ordering = ("-id",)
     inlines = (OrderItemInline,)
@@ -222,6 +223,7 @@ class OrderAdmin(ModelAdmin):
 @admin.register(AdminPaymentProfile)
 class AdminPaymentProfileAdmin(ModelAdmin):
     list_display = ("id", "title", "bank_name", "card_masked", "card_holder", "is_active", "sort_order")
+    list_display_links = list_display
     list_editable = ("is_active", "sort_order")
     search_fields = ("title", "bank_name", "card_number", "card_holder")
     ordering = ("-is_active", "sort_order", "id")
