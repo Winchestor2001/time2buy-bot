@@ -275,6 +275,10 @@ class CheckoutView(generics.CreateAPIView):
         ser = self.get_serializer(data=request.data)
         ser.is_valid(raise_exception=True)
         user_id = ser.validated_data["user_id"]
+        full_name = ser.validated_data["full_name"]
+        phone = ser.validated_data["phone"]
+        delivery_type = ser.validated_data["delivery_type"]
+        delivery_address = ser.validated_data.get("delivery_address") or ""
 
         tg_user, _ = TelegramUser.objects.get_or_create(tg_id=int(user_id))
 
@@ -325,7 +329,28 @@ class CheckoutView(generics.CreateAPIView):
         items_qs.delete()
 
         # 6) уведомляем админов (как у тебя было)
-        # notify_admins(...)
+        try:
+            admin_url = request.build_absolute_uri(reverse("admin:shop_order_change", args=[order.id]))
+        except Exception:
+            admin_url = f"(admin link unavailable, id={order.id})"
+
+        username = tg_user.username and f"@{tg_user.username.lstrip('@')}" or "—"
+        delivery_label = dict(Order.Delivery.choices).get(delivery_type, delivery_type)
+        addr_line = f"\n🏠 адрес: {delivery_address}" if delivery_type in (Order.Delivery.CDEK, Order.Delivery.POST_RU) and delivery_address else ""
+
+        notify_admins(
+            "\n".join(
+                [
+                    f"🆕 <b>Новый заказ #{order.id}</b>",
+                    f"👤 {full_name} • {phone}",
+                    f"🧑‍💻 tg_id: <code>{tg_user.tg_id}</code> | {username}",
+                    f"🚚 доставка: <b>{delivery_label}</b>{addr_line}",
+                    f"🧾 позиций: {len(bulk)}",
+                    f"💰 сумма: <b>{order.total_amount}</b>",
+                    f"🔗 {admin_url}",
+                ]
+            )
+        )
 
         return Response(OrderSerializer(order, context={"request": request}).data, status=200)
 
