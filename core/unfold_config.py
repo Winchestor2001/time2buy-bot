@@ -91,6 +91,12 @@ UNFOLD = {
                         "link": get_reverse_link(app_name="shop", model_name="infopage"),
                         "permission": lambda request: request.user.is_staff or request.user.is_superuser,
                     },
+                    {
+                        "title": "Платёжные реквизиты",
+                        "icon": "credit_card",
+                        "link": get_reverse_link(app_name="shop", model_name="adminpaymentprofile"),
+                        "permission": lambda request: request.user.is_staff or request.user.is_superuser,
+                    },
                 ],
             },
         ]
