@@ -309,6 +309,10 @@ class CheckoutView(generics.CreateAPIView):
         # 4) создаём заказ + снэпшот реквизитов
         order = Order.objects.create(
             tg_user=tg_user,
+            full_name=full_name,
+            phone=phone,
+            delivery_type=delivery_type,
+            delivery_address=delivery_address,
             pay_profile=pay,
             pay_bank=pay.bank_name,
             pay_card=pay.card_number,
