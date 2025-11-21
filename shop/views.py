@@ -1,6 +1,9 @@
+import logging
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, filters, status
 from rest_framework.permissions import AllowAny
@@ -24,6 +27,7 @@ from .serializers import (
 )
 from .telegram_auth import verify_telegram_init_data
 
+logger = logging.getLogger(__name__)
 
 # --- Категории ---
 
@@ -382,10 +386,12 @@ class InfoPageDetailView(generics.RetrieveAPIView):
     lookup_field = "slug"
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class TelegramWebAppAuthView(APIView):
     """
     POST /api/auth/telegram/  { "initData": "<window.Telegram.WebApp.initData>" }
-    Возвращает верифицированные данные юзера.
+    Верификация подписи Telegram WebApp и возврат user-данных.
+    Убираем CSRF, логируем тело (временно) и поддерживаем JSON/form.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -395,37 +401,63 @@ class TelegramWebAppAuthView(APIView):
         description="Верификация подписи Telegram WebApp и возврат user-данных"
     )
     def post(self, request):
-        ser = TelegramWebAppAuthRequestSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
-        init_data = ser.validated_data["initData"]
+        # --- debug logging (убрать/снизить уровень в проде) ---
+        try:
+            raw_body = request.body.decode("utf-8")
+        except Exception:
+            raw_body = "<unreadable body>"
+        logger.debug("TelegramWebAppAuth: headers=%s", {k: v for k, v in request.headers.items()})
+        logger.debug("TelegramWebAppAuth: raw_body=%s", raw_body[:2000])  # ограничим длину лога
+
+        # Поддержим JSON и form-urlencoded / multipart
+        init_data = None
+        ct = (request.content_type or "").lower()
+        if "application/json" in ct:
+            # DRF уже распарсил JSON в request.data
+            init_data = request.data.get("initData") or request.data.get("init_date") or request.data.get("init_data")
+        else:
+            # form-data / x-www-form-urlencoded / edge-cases
+            init_data = request.POST.get("initData") or request.POST.get("init_data") or request.data.get("initData")
+
+        if not init_data:
+            logger.warning("TelegramWebAppAuth: missing initData; content_type=%s body_preview=%s", ct, raw_body[:200])
+            return Response({"ok": False, "detail": "initData is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         bot_token = BOT_TOKEN
         if not bot_token:
-            return Response({"detail": "BOT_TOKEN не настроен"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("TelegramWebAppAuth: BOT_TOKEN not configured")
+            return Response({"ok": False, "detail": "server misconfigured: BOT_TOKEN missing"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         ok, payload, err = verify_telegram_init_data(init_data, bot_token, max_age=24 * 3600)
         if not ok:
-            return Response({"ok": False, "detail": err}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning("TelegramWebAppAuth: verification failed: %s; init_data_preview=%s", err, init_data[:200])
+            return Response({"ok": False, "detail": f"verify failed: {err}"}, status=status.HTTP_400_BAD_REQUEST)
 
         user_data = payload.get("user") or {}
-        # нормализуем поля
-        tg_id = int(user_data.get("id"))
+        # валидация id
+        try:
+            tg_id = int(user_data.get("id"))
+        except Exception:
+            logger.exception("TelegramWebAppAuth: invalid user id in payload: %r", user_data)
+            return Response({"ok": False, "detail": "invalid user id"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # нормализация полей
         username = user_data.get("username")
         first_name = user_data.get("first_name")
         last_name = user_data.get("last_name")
         language_code = user_data.get("language_code")
         is_premium = bool(user_data.get("is_premium", False))
 
-        # создадим/обновим пользователя в БД (необязательно, но удобно)
+        # Создаём/обновляем TelegramUser — это синхронная операция (ok в DRF view)
         TelegramUser.objects.update_or_create(
             tg_id=tg_id,
-            defaults=dict(
-                username=username,
-                first_name=first_name,
-                last_name=last_name,
-                language_code=language_code,
-                is_premium=is_premium,
-            ),
+            defaults={
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "language_code": language_code,
+                "is_premium": is_premium,
+            },
         )
 
         resp = {
