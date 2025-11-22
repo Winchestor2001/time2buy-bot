@@ -224,7 +224,6 @@ class OrderAdmin(ModelAdmin):
 class AdminPaymentProfileAdmin(ModelAdmin):
     list_display = ("id", "title", "bank_name", "card_masked", "card_holder", "is_active", "sort_order")
     list_display_links = list_display
-    list_editable = ("is_active", "sort_order")
     search_fields = ("title", "bank_name", "card_number", "card_holder")
     ordering = ("-is_active", "sort_order", "id")
 
